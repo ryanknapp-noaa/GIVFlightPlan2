@@ -347,16 +347,8 @@
       </div>
     </div>
 
-    <div class="row">
-      <div>
-        <label for="groundSpeed">Ground speed (kt)</label>
-        <input id="groundSpeed" type="number" step="1" value="450">
-      </div>
-      <div>
-        <label for="taxiMin">Taxi/climb allowance (min)</label>
-        <input id="taxiMin" type="number" step="1" value="1">
-      </div>
-    </div>
+    <label for="groundSpeed">Ground speed (kt)</label>
+    <input id="groundSpeed" type="number" step="1" value="450">
     <div class="hint">Used only to compute leg times for the drops/turns export files below &mdash; all elapsed times are relative to takeoff, matching the HRD mission-plan format.</div>
 
     <label for="maxRangeNm" style="margin-top:14px;">Max mission range (nmi)</label>
@@ -1085,7 +1077,6 @@ function updateRangeSummary(points){
   const div = document.getElementById('rangeSummary');
   const maxRange = parseFloat(document.getElementById('maxRangeNm').value) || 3200;
   const groundSpeed = parseFloat(document.getElementById('groundSpeed').value) || 450;
-  const taxiMin = parseFloat(document.getElementById('taxiMin').value) || 0;
   const effective = getEffectiveSequence();
   const usingEffective = effective.length > 0;
   const total = computeTotalDistanceNm(usingEffective ? effective : points);
@@ -1093,7 +1084,7 @@ function updateRangeSummary(points){
   const earlyExit = usingEffective && Math.abs(total - fullTotal) > 0.5;
   const pct = (total / maxRange) * 100;
   const over = total > maxRange;
-  const flightMin = taxiMin + (total / groundSpeed) * 60;
+  const flightMin = (total / groundSpeed) * 60;
   div.style.display = 'block';
   div.style.borderLeft = `6px solid ${over ? '#e2596b' : '#4dbd8a'}`;
   div.style.background = over ? '#2a1216' : '#0f2318';
@@ -1109,7 +1100,7 @@ function updateRangeSummary(points){
     </div>
     <div style="margin-top:10px; display:flex; justify-content:space-between; align-items:baseline; flex-wrap:wrap; gap:8px; padding-top:9px; border-top:1px solid #1e2938;">
       <div style="font-size:13.5px; font-weight:700; color:#dbe4ec;">\u2708 Total flight time: ${minutesToHM(flightMin)}</div>
-      <div style="font-size:12px; color:#8fa1b3;">at ${groundSpeed.toFixed(0)} kt${taxiMin ? ` + ${taxiMin.toFixed(0)} min taxi/climb` : ''}</div>
+      <div style="font-size:12px; color:#8fa1b3;">at ${groundSpeed.toFixed(0)} kt</div>
     </div>
     ${earlyExit ? `<div style="margin-top:8px; font-size:12px; color:#8fa1b3;">Recalculated for the selected first/last point &mdash; full pattern would be ${fullTotal.toFixed(0)} nmi.</div>` : ''}
   `;
@@ -1331,11 +1322,10 @@ function padR(str, width){ str = String(str); return str.length>=width ? str : s
 
 function buildExportRows(){
   const groundSpeed = parseFloat(document.getElementById('groundSpeed').value) || 450;
-  const taxiMin = parseFloat(document.getElementById('taxiMin').value) || 0;
   const pts = getEffectiveSequence();
 
   const rows = [];
-  let totalNm = 0, elapsedMin = taxiMin;
+  let totalNm = 0, elapsedMin = 0;
   for (let i=0; i<pts.length; i++){
     const p = pts[i];
     let legNm = 0;
@@ -1665,10 +1655,6 @@ document.getElementById('maxRangeNm').addEventListener('input', () => {
   updateTextPreviews();
 });
 document.getElementById('groundSpeed').addEventListener('input', () => {
-  if (lastGenState) updateRangeSummary(lastGenState.points);
-  updateTextPreviews();
-});
-document.getElementById('taxiMin').addEventListener('input', () => {
   if (lastGenState) updateRangeSummary(lastGenState.points);
   updateTextPreviews();
 });
