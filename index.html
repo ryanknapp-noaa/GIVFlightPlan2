@@ -2,138 +2,208 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>G-IV Synoptic Surveillance Pattern Generator</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <style>
   :root{
-    --bg:#0a0e14;
-    --panel:#121822;
-    --panel2:#161e2b;
-    --border:#232d3d;
-    --ink:#e7edf3;
-    --muted:#8fa1b3;
+    --bg:#0a1118;
+    --panel:#0f1922;
+    --panel2:#142230;
+    --border:#22323f;
+    --line-dim:#1a2731;
+    --ink:#cfdbe6;
+    --muted:#7d8fa0;
     --muted2:#6b7d90;
-    --accent:#f0a94e;
-    --accent2:#4ea1f0;
+    --accent:#5fd4d6;
+    --accent2:#5fd4d6;
+    --accent-dim:#2f5b5c;
+    --amber:#e8a13c;
     --danger:#e2596b;
-    --good:#4dbd8a;
-    --sans: 'Inter', 'Segoe UI', Helvetica, Arial, sans-serif;
+    --good:#7bc67e;
+    --sans: 'Space Grotesk', 'Segoe UI', Helvetica, Arial, sans-serif;
     --mono: 'IBM Plex Mono', 'SF Mono', Consolas, monospace;
   }
   *{box-sizing:border-box;}
   html, body{ height:auto; }
   body{
-    margin:0; font-family:var(--sans); background:var(--bg); color:var(--ink);
-    -webkit-font-smoothing:antialiased; min-height:100vh;
+    margin:0; font-family:var(--mono); color:var(--ink); -webkit-font-smoothing:antialiased; min-height:100vh;
+    background:
+      radial-gradient(1200px 600px at 15% -10%, #0f1c28 0%, transparent 60%),
+      radial-gradient(1000px 700px at 110% 10%, #0d1a22 0%, transparent 55%),
+      var(--bg);
   }
   header{
     background: linear-gradient(135deg, #0c1a2b, #0a0e14 75%);
     color:var(--ink); padding:28px 24px 22px; border-bottom:3px solid var(--accent);
     position:relative;
   }
-  header .inner{ max-width:900px; margin:0 auto; }
-  header h1{ margin:0; font-size:22px; letter-spacing:.01em; font-weight:700; }
+  header .inner{ max-width:1400px; margin:0 auto; }
+  header h1{ margin:0; font-family:var(--sans); font-size:22px; letter-spacing:.03em; font-weight:700; color:#eef4f8; }
   header p{ margin:9px 0 0; font-size:13px; color:var(--muted); max-width:840px; line-height:1.65; }
 
-  .flow{ max-width:900px; margin:0 auto; padding:24px 20px 60px; display:flex; flex-direction:column; gap:18px; }
+  .flow{ max-width:1400px; margin:0 auto; padding:24px 20px 60px; display:grid; grid-template-columns:340px 1fr; gap:20px; align-items:start; }
+  @media (max-width:980px){ .flow{ grid-template-columns:1fr; } }
+  .sidebar{ display:flex; flex-direction:column; gap:18px; position:sticky; top:20px; }
+  .main{ display:flex; flex-direction:column; gap:18px; min-width:0; }
 
   .panel, .chart-card{
-    background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:20px 20px 22px;
+    background:linear-gradient(180deg,var(--panel2),var(--panel));
+    border:1px solid var(--border); border-radius:8px; padding:20px 20px 22px;
     box-shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.25);
   }
   .panel h2, .chart-card h2{
-    font-size:11px; text-transform:uppercase; letter-spacing:.1em; font-weight:700;
+    font-family:var(--sans); font-size:12.5px; text-transform:uppercase; letter-spacing:.12em; font-weight:700;
     color:var(--accent); margin:24px 0 14px; padding-bottom:9px; border-bottom:1px solid var(--border);
-    display:flex; align-items:center; gap:8px;
+    display:flex; align-items:center; gap:9px;
+  }
+  .panel h2::before, .chart-card h2::before{
+    content:''; width:8px; height:8px; background:var(--accent); box-shadow:0 0 8px var(--accent); border-radius:1px; flex:none;
   }
   .panel h2:first-child, .chart-card h2:first-child{ margin-top:0; }
-  label{ display:block; font-size:12.5px; font-weight:600; color:#c3d0dc; margin:10px 0 4px; }
+  .panel details{ margin-top:12px; }
+  .panel details:first-of-type{ margin-top:0; }
+  .panel summary{
+    font-family:var(--sans); font-size:12.5px; text-transform:uppercase; letter-spacing:.12em; font-weight:700;
+    color:var(--accent); padding-bottom:9px; border-bottom:1px solid var(--border); margin-bottom:14px;
+    display:flex; align-items:center; gap:9px; cursor:pointer; list-style:none; user-select:none;
+  }
+  .panel summary::-webkit-details-marker{ display:none; }
+  .panel summary::before{ content:''; width:8px; height:8px; background:var(--accent); box-shadow:0 0 8px var(--accent); border-radius:1px; flex:none; }
+  .panel summary::after{ content:'+'; margin-left:auto; color:var(--muted); font-size:15px; font-weight:400; }
+  .panel details[open] > summary::after{ content:'\2212'; }
+  .panel details[open] > summary{ margin-bottom:14px; }
+  .sidebar-actions{ margin-top:16px; padding-top:16px; border-top:1px solid var(--border); }
+  label{ display:block; font-size:10.5px; font-weight:700; color:var(--amber); letter-spacing:.1em; text-transform:uppercase; margin:12px 0 5px; }
   .row{ display:grid; grid-template-columns: 1fr 1fr; gap:8px; }
   input, select{
-    width:100%; padding:9px 10px; font-size:13px; border:1px solid #2a3648;
-    border-radius:7px; font-family: var(--mono); color:var(--ink); background:#0d1420;
+    width:100%; padding:9px 10px; font-size:13px; border:1px solid var(--border);
+    border-radius:4px; font-family: var(--mono); color:var(--ink); background:#081016;
     transition: border-color .15s, box-shadow .15s;
   }
-  input:focus, select:focus{ outline:none; border-color:var(--accent); box-shadow:0 0 0 3px rgba(240,169,78,.2); }
-  input::placeholder{ color:#4d5c6e; }
-  select option{ background:#0d1420; color:var(--ink); }
-  .hint{ font-size:11.5px; color:var(--muted2); margin-top:4px; line-height:1.55; }
+  input:focus, select:focus{ outline:none; border-color:var(--accent); box-shadow:0 0 0 2px rgba(95,212,214,.18); }
+  input::placeholder{ color:#3d4c5e; }
+  select{
+    appearance:none; -webkit-appearance:none;
+    background-image:linear-gradient(45deg,transparent 50%, var(--accent) 50%),linear-gradient(135deg, var(--accent) 50%,transparent 50%);
+    background-position:calc(100% - 16px) center, calc(100% - 11px) center;
+    background-size:5px 5px, 5px 5px; background-repeat:no-repeat;
+  }
+  select option{ background:#081016; color:var(--ink); }
+  .hint{ font-size:11px; color:var(--muted2); margin-top:4px; line-height:1.55; letter-spacing:.02em; }
 
-  .check{ display:flex; align-items:center; gap:7px; font-weight:400; font-size:13px; color:#c3d0dc; }
+  .divider{ height:1px; background:var(--border); margin:16px 0; }
+
+  .check{ display:flex; align-items:center; gap:7px; font-weight:400; font-size:13px; color:var(--ink); font-family:var(--mono); }
   .check input{ width:auto; margin:0; accent-color:var(--accent); }
   .check-grid{ display:grid; grid-template-columns:1fr 1fr; gap:6px 12px; margin-top:6px; }
 
   button{
-    margin-top:14px; width:100%; padding:12px; font-size:12.5px; font-weight:700;
-    letter-spacing:.05em; background:var(--accent); color:#241304; border:none;
-    border-radius:8px; cursor:pointer; text-transform:uppercase;
-    transition: background .15s, transform .1s, filter .15s;
+    margin-top:14px; width:100%; padding:9px 10px; font-size:11px; font-weight:700;
+    font-family:var(--mono); letter-spacing:.05em; background:transparent; color:var(--accent);
+    border:1px solid var(--accent-dim); border-radius:4px; cursor:pointer; text-transform:uppercase;
+    transition: background .12s, transform .1s, filter .12s;
   }
-  button:hover{ filter:brightness(1.08); }
+  .btnrow{ display:flex; gap:7px; margin-top:9px; }
+  .btnrow button{ flex:1; margin-top:0; min-width:0; padding:8px 6px; font-size:10px; }
+  .exports{ display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  @media (max-width:700px){ .exports{ grid-template-columns:1fr; } }
+  .exports .chart-card{ margin:0; }
+  button:hover{ background:rgba(95,212,214,.1); border-color:var(--accent); }
   button:active{ transform: translateY(1px); }
-  button.secondary{ background:transparent; color:var(--accent2); border:1px solid #2a4258; margin-top:9px; }
-  button.secondary:hover{ background:#101c2b; filter:none; }
-  button.windy{ background:#1d7fd6; color:#eaf4ff; }
+  button.primary{ background:var(--accent); color:#06171a; font-weight:700; border-color:var(--accent); }
+  button.primary:hover{ background:#7fe0e2; filter:none; }
+  button.secondary{ background:transparent; color:var(--muted); border:1px solid var(--border); margin-top:9px; }
+  button.secondary:hover{ background:#101c2b; color:var(--ink); }
+  button.windy{ background:#1d7fd6; color:#eaf4ff; border-color:#1d7fd6; }
   button.windy:hover{ filter:brightness(1.1); }
 
-  .chart-card .cap{ font-size:12.5px; color:var(--muted); margin-bottom:12px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:6px; font-weight:500; }
-  .chart-card .cap span:first-child{ color:var(--ink); font-weight:600; }
+  .chart-card .cap{ font-size:12px; color:var(--muted); margin-bottom:12px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:6px; font-weight:500; letter-spacing:.02em; }
+  .chart-card .cap span:first-child{ color:var(--ink); font-weight:600; font-family:var(--sans); text-transform:uppercase; font-size:11px; letter-spacing:.08em; }
 
-  #map{ height:560px; border-radius:9px; border:1px solid var(--border); }
+  #map{ height:560px; border-radius:5px; border:1px solid var(--border); background:#0a1118; }
 
-  table{ width:100%; border-collapse:collapse; font-size:12.5px; font-family: var(--mono); }
-  thead th{ text-align:left; background:#0d1420; color:#c3d0dc; padding:8px 10px; border-bottom:2px solid var(--border); position:sticky; top:0; font-family:var(--sans); font-size:11.5px; text-transform:uppercase; letter-spacing:.05em; }
-  tbody td{ padding:7px 10px; border-bottom:1px solid #1a2330; color:#dbe4ec; }
-  tbody tr:nth-child(even){ background:#0e1520; }
-  tbody tr:hover{ background:#132033; }
-  .tag{ display:inline-block; font-size:10px; font-weight:700; padding:2px 7px; border-radius:4px; text-transform:uppercase; letter-spacing:.03em; }
+  table{ width:100%; border-collapse:collapse; font-size:12px; font-family: var(--mono); }
+  thead th{ text-align:left; background:#0a1119; color:var(--amber); padding:8px 10px; border-bottom:1px solid var(--border); position:sticky; top:0; font-size:10.5px; text-transform:uppercase; letter-spacing:.1em; font-weight:700; }
+  tbody td{ padding:7px 10px; border-bottom:1px solid var(--line-dim); color:var(--ink); }
+  tbody tr:hover td{ background:rgba(95,212,214,.05); }
+  tbody td:nth-child(5), tbody td:nth-child(6), tbody td:nth-child(7), tbody td:nth-child(8){ color:var(--accent); }
+  tbody td:nth-child(3) strong{
+    display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px;
+    border-radius:50%; border:1px solid var(--accent); color:var(--accent); font-size:10.5px; font-weight:600; font-style:normal;
+  }
+  .tag{ display:inline-block; font-size:9.5px; font-weight:700; padding:2px 7px; border-radius:3px; text-transform:uppercase; letter-spacing:.05em; }
   .tag.outer{ background:#123321; color:#5bd696; }
   .tag.inner{ background:#0f2740; color:#6cb3f2; }
   .tag.mid{ background:#3a2b12; color:#f0b355; }
   .tag.figure4{ background:#182a49; color:#8fb3f0; }
   .tag.center{ background:#3a1518; color:#f0808f; }
   .tag.airport{ background:#26173f; color:#c3a6f5; }
-  .table-wrap{ max-height:420px; overflow:auto; border:1px solid var(--border); border-radius:9px; margin-top:10px;}
-  footer{ text-align:center; font-size:11.5px; color:var(--muted2); padding:26px 20px 40px; max-width:900px; margin:0 auto; }
+  .table-wrap{ max-height:420px; overflow:auto; border:1px solid var(--border); border-radius:5px; margin-top:10px;}
+  footer{ text-align:left; font-size:10.5px; color:var(--muted2); padding:20px 20px 0; max-width:1400px; margin:6px auto 40px; line-height:1.7; border-top:1px solid var(--border); }
+  footer b{ color:var(--amber); }
 
-  .giv-marker{ display:flex; align-items:center; justify-content:center; font-weight:700; border-radius:50%; }
+  .giv-marker{ display:flex; align-items:center; justify-content:center; font-weight:700; border-radius:50%; font-family:var(--mono); }
   .leaflet-legend{
-    background:#121822; padding:11px 13px; border-radius:8px; box-shadow:0 2px 10px rgba(0,0,0,.5);
-    font-size:12px; line-height:1.8; color:#dbe4ec; font-family:var(--sans); border:1px solid var(--border);
+    background:rgba(10,17,24,.9); padding:10px 13px; border-radius:5px; box-shadow:0 2px 10px rgba(0,0,0,.5);
+    font-size:11px; line-height:1.9; color:var(--muted); font-family:var(--mono); border:1px solid var(--border);
   }
-  .leaflet-legend .sw{ display:inline-block; width:11px; height:11px; border-radius:50%; margin-right:6px; vertical-align:middle; border:1px solid #333; }
-  .shear-box{
-    background:#121822; padding:9px 13px; border-radius:8px; box-shadow:0 2px 10px rgba(0,0,0,.5);
-    font-size:12px; font-weight:700; color:#dbe4ec; display:flex; align-items:center; gap:8px; font-family:var(--sans);
-    border:1px solid var(--border);
-  }
+  .leaflet-legend .sw{ display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:6px; vertical-align:middle; }
   .airport-marker{
-    display:flex; align-items:center; justify-content:center; font-weight:700;
+    display:flex; align-items:center; justify-content:center; font-weight:700; font-family:var(--mono);
     box-shadow:0 1px 3px rgba(0,0,0,.6);
   }
-  .leaflet-control-zoom a{ background:#121822 !important; color:#dbe4ec !important; border-color:var(--border) !important; }
-  .leaflet-control-zoom a:hover{ background:#1a2330 !important; }
-  .leaflet-control-attribution{ background:rgba(18,24,34,.85) !important; color:#8fa1b3 !important; }
-  .leaflet-control-attribution a{ color:#4ea1f0 !important; }
+  .leaflet-control-zoom a{ background:#101a26 !important; color:var(--accent) !important; border-color:var(--border) !important; }
+  .leaflet-control-zoom a:hover{ background:#16212f !important; }
+  .leaflet-control-attribution{ background:rgba(10,17,24,.75) !important; color:var(--muted) !important; font-size:9px !important; }
+  .leaflet-control-attribution a{ color:var(--accent) !important; }
+  .leaflet-tooltip.mono-tip{
+    background:#0f1922; border:1px solid var(--border); color:var(--ink);
+    font-family:var(--mono); font-size:11px; border-radius:3px;
+  }
+  .leaflet-tooltip.mono-tip::before{ border-top-color:var(--border); }
+
+  textarea{
+    width:100%; min-height:280px; background:#081016; border:1px solid var(--border);
+    color:var(--ink); font-family:var(--mono); font-size:11px; padding:10px;
+    border-radius:4px; resize:vertical; line-height:1.5; white-space:pre;
+  }
+  textarea:focus{ outline:none; border-color:var(--accent); box-shadow:0 0 0 2px rgba(95,212,214,.18); }
+
+  .toast{
+    position:fixed; bottom:22px; left:50%; transform:translateX(-50%) translateY(20px);
+    background:var(--accent); color:#06171a; font-family:var(--mono);
+    font-size:12px; font-weight:600; padding:10px 18px; border-radius:5px;
+    opacity:0; pointer-events:none; transition:all .25s ease; z-index:2000;
+  }
+  .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
 </style>
 </head>
 <body>
 
 <header>
-  <div class="inner">
-    <h1>G-IV Synoptic Surveillance Pattern Generator</h1>
-    <p>Enter a storm center fix and generate the NOAA/AOML G-IV Over-Storm pattern &mdash; a double circumnavigation (12-point outer ring, 8-point inner ring, nominally 60/90&nbsp;nmi, expandable to 90/120&nbsp;nmi) with a figure-four at the end. The figure-four legs (NE/SE/SW/NW) match the inner circumnavigation radius, with a true-midpoint dropsonde and a center drop &mdash; 29 dropsondes total, plotted on a live Leaflet map.</p>
-    <p style="margin:4px 0 0; font-size:12px; color:#7d8fa1;">Source: <a href="https://www.aoml.noaa.gov/wp-content/uploads/2026/05/2026HFP_EarlyStage_Flight_Patterns_GIV_overstorm.pdf" style="color:var(--accent2);">AOML 2026 HFP Early Stage &mdash; G-IV Over-Storm Flight Pattern</a>.</p>
+  <div class="inner" style="display:flex; justify-content:space-between; align-items:flex-end; gap:16px; flex-wrap:wrap;">
+    <div class="title-block">
+      <h1>G-IV SYNOPTIC SURVEILLANCE PATTERN GENERATOR</h1>
+      <div style="font-size:11px; letter-spacing:2px; color:var(--accent); margin-top:6px; text-transform:uppercase;">NOAA / AOML &middot; G-IV Over-Storm &middot; Double Circumnavigation + Figure-Four</div>
+      <p style="max-width:640px;">Enter a storm center fix and generate the NOAA/AOML G-IV Over-Storm pattern &mdash; a double circumnavigation (12-point outer ring at a selectable 120/150/180&nbsp;nmi radius, 8-point inner ring) with a figure-four at the end, plotted on a live Leaflet map.</p>
+    </div>
+    <div style="font-size:11px; color:var(--muted); text-align:right; line-height:1.7;">
+      OUTER <b style="color:var(--amber);">120&ndash;180 NM</b> &middot; INNER <b style="color:var(--amber);">60&ndash;90 NM</b><br>
+      Source: <a href="https://www.aoml.noaa.gov/wp-content/uploads/2026/05/2026HFP_EarlyStage_Flight_Patterns_GIV_overstorm.pdf" style="color:var(--accent);">AOML 2026 HFP Early Stage</a>
+    </div>
   </div>
 </header>
 
 <div class="flow">
-
+  <div class="sidebar">
   <div class="panel">
-    <h2>Center Fix</h2>
+    <details>
+    <summary>Center Fix</summary>
     <div class="row">
       <div>
         <label for="lat">Latitude</label>
@@ -155,58 +225,11 @@
       </div>
     </div>
     <div class="hint">Decimal degrees. Example above matches the sample pattern (28.60N, 61.60W).</div>
+    </details>
 
-    <h2 style="margin-top:20px;">Pattern Geometry</h2>
-    <label for="preset">Configuration (per AOML G-IV Over-Storm spec)</label>
-    <select id="preset">
-      <option value="nominal">Nominal &mdash; 60 / 90 nmi</option>
-      <option value="expanded">Expanded (safety) &mdash; 90 / 120 nmi</option>
-      <option value="custom">Custom</option>
-    </select>
-    <div class="hint">Per the AOML Early Stage G-IV Over-Storm pattern: a double circumnavigation nominally at 60/90&nbsp;nmi, expandable to 90/120&nbsp;nmi for safety. The figure-four leg length always matches the inner circumnavigation radius.</div>
-
-    <label for="outerR">Outer circumnavigation radius (nmi)</label>
-    <input id="outerR" type="number" step="1" value="90">
-    <label class="check" style="margin-top:8px;"><input id="showOuter" type="checkbox" checked> Include outer circumnavigation</label>
-
-    <label for="innerR" style="margin-top:14px;">Inner circumnavigation radius (nmi)</label>
-    <input id="innerR" type="number" step="1" value="60">
-    <label class="check" style="margin-top:8px;"><input id="showInner" type="checkbox" checked> Include inner circumnavigation</label>
-    <div class="hint">With the inner ring on, the default figure-four flies: start at point 20 (the ring's own last point) &rarr; cross the center &rarr; 21 (NW) &rarr; downwind of center &rarr; 22 (NE) &rarr; cross the center &rarr; out to 23 (SW). That's the standard 3-leg pattern, matching the real HRD mission convention. The 4th leg (SE, would be 24) is off by default since it just duplicates point 20's location &mdash; check it back on if you want that closing loop. With the inner ring off, there's no ring point to enter from, so it's flown as its own chain instead: enter NW, cross straight through the center to SE, transit directly over to NE, then cross through the center again to exit at SW. Each vertex lands exactly on the inner circumnavigation's diagonal point (leg length = inner radius) when the inner ring is shown. Midpoint (M) dropsondes, if enabled, sit at the true midpoint between the center fix and each vertex.</div>
-
-    <label style="margin-top:14px;">Figure-four legs to fly</label>
-    <div class="check-grid">
-      <label class="check"><input id="legNW" type="checkbox" checked> NW</label>
-      <label class="check"><input id="legSE" type="checkbox"> SE</label>
-      <label class="check"><input id="legNE" type="checkbox" checked> NE</label>
-      <label class="check"><input id="legSW" type="checkbox" checked> SW</label>
-    </div>
-    <label class="check" style="margin-top:8px;"><input id="showMidpoints" type="checkbox" checked> Include midpoint (M) drops</label>
-    <div class="hint">Uncheck a leg for safety (per AOML guidance, one crossing leg can be dropped). Uncheck midpoints to match mission plans that fly straight vertex-to-vertex, like the sample GABRIELLE plan. Figure-four points are numbered automatically, continuing right after the last circumnavigation point in use.</div>
-
-    <label for="fig4Rot" style="margin-top:14px;">Figure-four rotation offset (&deg;)</label>
-    <input id="fig4Rot" type="number" step="1" value="0">
-    <div class="hint" id="fig4RotHint">Rotates the figure-four independently of the pattern orientation offset above. With the inner ring on, this moves the vertices off the ring's diagonal points (they'll no longer be a coincident 2nd drop) &mdash; use it deliberately.</div>
-
-    <label for="rot">Pattern orientation offset (&deg;, clockwise from true N)</label>
-    <input id="rot" type="number" step="1" value="0">
-    <div class="hint">Rotates the whole pattern &mdash; use this to align point 7 with true north (0, default) or with storm motion.</div>
-
-    <h2 style="margin-top:20px;">Optional &mdash; Deep-Layer Shear</h2>
-    <div class="row">
-      <div>
-        <label for="vwsDir">From bearing (&deg;)</label>
-        <input id="vwsDir" type="number" step="1" placeholder="e.g. 315">
-      </div>
-      <div>
-        <label for="vwsSpd">Speed (kt)</label>
-        <input id="vwsSpd" type="number" step="1" placeholder="e.g. 8">
-      </div>
-    </div>
-    <div class="hint">Leave blank to omit the shear indicator.</div>
-
-    <h2 style="margin-top:20px;">Departure Airport</h2>
-    <label for="depId">Identifier (type ICAO code or name)</label>
+    <details>
+    <summary>Airports</summary>
+    <label for="depId">Departure &mdash; Identifier (type ICAO code or name)</label>
     <input id="depId" type="text" placeholder="e.g. KMCF" maxlength="60" list="airportCodes" autocomplete="off">
     <div class="hint" id="depMatch">Type a US ICAO code (e.g. KMCF) to auto-fill coordinates, or enter lat/lon manually below.</div>
     <div class="row">
@@ -237,8 +260,9 @@
     </select>
     <div class="hint">Pick whichever point your route actually starts on &mdash; useful if you've removed the outer or inner ring. The list fills in after you generate the pattern.</div>
 
-    <h2 style="margin-top:20px;">Arrival Airport</h2>
-    <label for="arrId">Identifier (type ICAO code or name)</label>
+    <div class="divider"></div>
+
+    <label for="arrId">Arrival &mdash; Identifier (type ICAO code or name)</label>
     <input id="arrId" type="text" placeholder="e.g. KMCF" maxlength="60" list="airportCodes" autocomplete="off">
     <div class="hint" id="arrMatch">Type a US ICAO code (e.g. KMCF) to auto-fill coordinates, or enter lat/lon manually below.</div>
     <div class="row">
@@ -268,8 +292,47 @@
       <option value="CTR">CTR &mdash; Center Fix (default)</option>
     </select>
     <div class="hint">Departure always connects to point 1. Pick whichever point your route actually finishes on &mdash; the list fills in after you generate the pattern.</div>
+    </details>
 
-    <h2 style="margin-top:20px;">Mission Info &amp; Export</h2>
+    <details>
+    <summary>Pattern Geometry</summary>
+    <label for="outerR">Outer circumnavigation radius (nmi)</label>
+    <select id="outerR">
+      <option value="120">120 nmi</option>
+      <option value="150">150 nmi</option>
+      <option value="180">180 nmi</option>
+    </select>
+    <label class="check" style="margin-top:8px;"><input id="showOuter" type="checkbox" checked> Include outer circumnavigation</label>
+
+    <label for="innerR" style="margin-top:14px;">Inner circumnavigation radius (nmi)</label>
+    <select id="innerR">
+      <option value="60">60 nmi</option>
+      <option value="90">90 nmi</option>
+    </select>
+    <label class="check" style="margin-top:8px;"><input id="showInner" type="checkbox" checked> Include inner circumnavigation</label>
+    <div class="hint">With the inner ring on, the default figure-four flies: start at point 20 (the ring's own last point) &rarr; cross the center &rarr; 21 (NW) &rarr; downwind of center &rarr; 22 (NE) &rarr; cross the center &rarr; out to 23 (SW). That's the standard 3-leg pattern, matching the real HRD mission convention. The 4th leg (SE, would be 24) is off by default since it just duplicates point 20's location &mdash; check it back on if you want that closing loop. With the inner ring off, there's no ring point to enter from, so it's flown as its own chain instead: enter NW, cross straight through the center to SE, transit directly over to NE, then cross through the center again to exit at SW. Each vertex lands exactly on the inner circumnavigation's diagonal point (leg length = inner radius) when the inner ring is shown. Midpoint (M) dropsondes, if enabled, sit at the true midpoint between the center fix and each vertex.</div>
+
+    <label style="margin-top:14px;">Figure-four legs to fly</label>
+    <div class="check-grid">
+      <label class="check"><input id="legNW" type="checkbox" checked> NW</label>
+      <label class="check"><input id="legSE" type="checkbox"> SE</label>
+      <label class="check"><input id="legNE" type="checkbox" checked> NE</label>
+      <label class="check"><input id="legSW" type="checkbox" checked> SW</label>
+    </div>
+    <label class="check" style="margin-top:8px;"><input id="showMidpoints" type="checkbox" checked> Include midpoint (M) drops</label>
+    <div class="hint">Uncheck a leg for safety (per AOML guidance, one crossing leg can be dropped). Uncheck midpoints to match mission plans that fly straight vertex-to-vertex, like the sample GABRIELLE plan. Figure-four points are numbered automatically, continuing right after the last circumnavigation point in use.</div>
+
+    <label for="fig4Rot" style="margin-top:14px;">Figure-four rotation offset (&deg;)</label>
+    <input id="fig4Rot" type="number" step="1" value="0">
+    <div class="hint" id="fig4RotHint">Rotates the figure-four independently of the pattern orientation offset above. With the inner ring on, this moves the vertices off the ring's diagonal points (they'll no longer be a coincident 2nd drop) &mdash; use it deliberately.</div>
+
+    <label for="rot">Pattern orientation offset (&deg;, clockwise from true N)</label>
+    <input id="rot" type="number" step="1" value="0">
+    <div class="hint">Rotates the whole pattern &mdash; use this to align point 7 with true north (0, default) or with storm motion.</div>
+    </details>
+
+    <details>
+    <summary>Mission Info &amp; Export</summary>
     <label for="missionName">Mission / storm name</label>
     <input id="missionName" type="text" placeholder="e.g. GABRIELLE" value="STORM">
 
@@ -287,7 +350,7 @@
     <div class="row">
       <div>
         <label for="groundSpeed">Ground speed (kt)</label>
-        <input id="groundSpeed" type="number" step="1" value="400">
+        <input id="groundSpeed" type="number" step="1" value="450">
       </div>
       <div>
         <label for="taxiMin">Taxi/climb allowance (min)</label>
@@ -299,13 +362,21 @@
     <label for="maxRangeNm" style="margin-top:14px;">Max mission range (nmi)</label>
     <input id="maxRangeNm" type="number" step="10" value="3200">
     <div class="hint">Total flown distance (departure &rarr; every point &rarr; arrival) is checked against this limit every time you generate.</div>
+    </details>
 
-    <button id="genBtn">Generate Pattern</button>
-    <button id="csvBtn" class="secondary">Download Fix List (CSV)</button>
-    <button id="dropsBtn" class="secondary">Download Drops (.txt)</button>
-    <button id="turnsBtn" class="secondary">Download Turns (.txt)</button>
+    <div class="sidebar-actions">
+    <button id="genBtn" class="primary">Generate Pattern</button>
+    <div class="btnrow">
+      <button id="csvBtn" class="secondary" title="Download Fix List (CSV)">CSV</button>
+      <button id="dropsBtn" class="secondary" title="Download Drops (.txt)">Drops</button>
+      <button id="turnsBtn" class="secondary" title="Download Turns (.txt)">Turns</button>
+    </div>
+    </div>
   </div>
 
+  </div>
+
+  <div class="main">
   <div id="rangeSummary" class="chart-card" style="padding:14px 18px; display:none;"></div>
 
   <div class="chart-card">
@@ -317,11 +388,15 @@
   </div>
 
   <div class="chart-card">
-    <div class="cap"><span>Fix List</span></div>
-    <div class="table-wrap">
+    <div class="cap">
+      <span>Fix List</span>
+      <span id="removeStatus" style="color:#8fa1b3;"></span>
+    </div>
+    <button id="removeSelectedBtn" class="secondary" style="margin-top:0; width:auto; padding:8px 16px;">Remove Selected Points</button>
+    <div class="table-wrap" style="margin-top:10px;">
       <table>
         <thead>
-          <tr><th>Pt</th><th>Type</th><th>Bearing</th><th>Range (nmi)</th><th>Latitude</th><th>Longitude</th></tr>
+          <tr><th></th><th>Seq</th><th>Pt</th><th>Type</th><th>Bearing</th><th>Range (nmi)</th><th>Latitude</th><th>Longitude</th></tr>
         </thead>
         <tbody id="tbody"></tbody>
       </table>
@@ -329,18 +404,56 @@
   </div>
 
   <div class="chart-card">
-    <h2 style="margin-top:0;">Export to Windy.com</h2>
-    <div class="hint">Opens Windy's Distance &amp; Planning tool with the flight sequence plotted as a track (departure/arrival airports and midpoint dropsondes excluded &mdash; just the ring and figure-four vertices). Any point the route revisits is kept in, since Windy breaks the track if a repeated point is dropped. No overlay or time is forced &mdash; Windy opens with its own default model/time bar so you can pick those yourself.</div>
+    <div class="cap"><span>Drops.txt Preview</span></div>
+    <textarea id="dropsPreview" readonly placeholder="Generate the pattern to see the drops.txt preview here."></textarea>
+  </div>
 
-    <button id="windyOpenBtn" class="windy">Open route in Windy.com</button>
-    <button id="windyCopyBtn" class="secondary">Copy Windy route URL</button>
+  <div class="chart-card">
+    <div class="cap"><span>Turns.txt Preview</span></div>
+    <textarea id="turnsPreview" readonly placeholder="Generate the pattern to see the turns.txt preview here." style="min-height:420px;"></textarea>
+  </div>
+
+  <div class="exports">
+  <div class="chart-card">
+    <h2 style="margin-top:0;">Export to Windy.com</h2>
+    <div class="btnrow">
+      <button id="windyOpenBtn" class="windy">Open Route</button>
+      <button id="windyCopyBtn" class="secondary" title="Copy Windy route URL">Copy URL</button>
+    </div>
     <div class="hint" id="windyStatus"></div>
+  </div>
+
+  <div class="chart-card">
+    <h2 style="margin-top:0;">Export to SkyVector</h2>
+    <div class="btnrow">
+      <button id="skyvectorOpenBtn" class="secondary" style="background:#173a63; color:#cfe3ff; border-color:#2a4f7f;" title="Open route in SkyVector">Open Route</button>
+      <button id="skyvectorCopyBtn" class="secondary" title="Copy SkyVector URL">Copy URL</button>
+    </div>
+    <div class="hint" id="skyvectorStatus"></div>
+  </div>
+
+  <div class="chart-card">
+    <h2 style="margin-top:0;">Export to ForeFlight</h2>
+    <div class="btnrow">
+      <button id="foreflightOpenBtn" class="secondary" style="background:#2a1f42; color:#ddc9ff; border-color:#4a3670;" title="Open route in ForeFlight Mobile">Open Route</button>
+      <button id="foreflightCopyBtn" class="secondary" title="Copy route string for FPL editor">Copy String</button>
+    </div>
+    <div class="hint" id="foreflightStatus"></div>
+  </div>
+
+  <div class="chart-card">
+    <h2 style="margin-top:0;">Export for Onboard 800 UI</h2>
+    <button id="ui800Btn" class="secondary" style="background:#1f3a2e; color:#bdf0d5; border-color:#2f5a45;">Download 800 UI Points (.txt)</button>
+  </div>
+  </div>
+
+  <footer>All ranges/bearings computed via great-circle destination formula (spherical Earth, R = 3440.065 nmi). Map tiles &copy; OpenStreetMap contributors. <b>Verify</b> against official NOAA/AOML mission tasking before flight.</footer>
   </div>
 
 </div>
 
-<footer>All ranges/bearings computed via great-circle destination formula (spherical Earth, R = 3440.065 nmi). Map tiles &copy; OpenStreetMap contributors. Verify against official NOAA/AOML mission tasking before flight.</footer>
 <datalist id="airportCodes"></datalist>
+<div class="toast" id="toast">Copied to clipboard</div>
 
 <script>
 const US_AIRPORTS = [
@@ -697,6 +810,14 @@ function destPoint(lat0, lon0, bearingDeg, distNm){
   return { lat: toDeg(φ2), lon: ((toDeg(λ2)+540)%360)-180 };
 }
 
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(window.__toastTimer);
+  window.__toastTimer = setTimeout(() => t.classList.remove('show'), 1800);
+}
+
 function decToDMS(val, isLat){
   const hemi = isLat ? (val>=0?'N':'S') : (val>=0?'E':'W');
   const a = Math.abs(val);
@@ -749,13 +870,13 @@ let lastPoints = null;
 let map = null;
 let layerGroup = null;
 let legendControl = null;
-let shearControl = null;
 
 function initMap(){
   map = L.map('map', { zoomSnap:0.25 }).setView([25, -65], 5);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 12,
-    attribution: '&copy; OpenStreetMap contributors'
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    subdomains: 'abcd',
+    maxZoom: 19,
+    attribution: '&copy; OpenStreetMap contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
   }).addTo(map);
   layerGroup = L.layerGroup().addTo(map);
 }
@@ -763,17 +884,17 @@ function initMap(){
 function makeIcon(label, bg, border, size){
   return L.divIcon({
     className: 'giv-marker',
-    html: `<div style="width:${size}px;height:${size}px;background:${bg};border:2px solid ${border};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;color:#08210e;">${label}</div>`,
+    html: `<div style="width:${size}px;height:${size}px;background:${bg};border:1.5px solid ${border};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;color:${border};box-shadow:0 0 6px ${border}66;">${label}</div>`,
     iconSize: [size, size],
     iconAnchor: [size/2, size/2]
   });
 }
 
-function makeAirportIcon(){
-  const w = 30, h = 30;
+function makeAirportIcon(letter){
+  const w = 22, h = 22;
   return L.divIcon({
     className: 'airport-marker',
-    html: `<div style="width:${w}px;height:${h}px;background:#4a2fa8;border:2px solid #2c1a66;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:15px;color:#fff;">&#9992;</div>`,
+    html: `<div style="width:${w}px;height:${h}px;background:#0a1118;border:1.5px solid #e8a13c;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;color:#e8a13c;">${letter||'A'}</div>`,
     iconSize: [w, h],
     iconAnchor: [w/2, h/2]
   });
@@ -796,7 +917,7 @@ function generate(){
   const lonIn = parseFloat(document.getElementById('lon').value);
   const latHemi = document.getElementById('latHemi').value;
   const lonHemi = document.getElementById('lonHemi').value;
-  const outerR = parseFloat(document.getElementById('outerR').value) || 90;
+  const outerR = parseFloat(document.getElementById('outerR').value) || 120;
   const innerR = parseFloat(document.getElementById('innerR').value) || 60;
   const showOuter = document.getElementById('showOuter').checked;
   const showInner = document.getElementById('showInner').checked;
@@ -920,6 +1041,7 @@ function generate(){
   populateLastPointSelect(points);
   renderMap(points, centerLat, centerLon, outerR, innerR, MID_FRAC, departure, arrival);
   updateRangeSummary(points);
+  updateTextPreviews();
 
   document.getElementById('chartCaption').textContent =
     `Pattern centered ${decToDMS(centerLat,true)} ${decToDMS(centerLon,false)}`;
@@ -962,6 +1084,8 @@ function getEffectiveSequence(){
 function updateRangeSummary(points){
   const div = document.getElementById('rangeSummary');
   const maxRange = parseFloat(document.getElementById('maxRangeNm').value) || 3200;
+  const groundSpeed = parseFloat(document.getElementById('groundSpeed').value) || 450;
+  const taxiMin = parseFloat(document.getElementById('taxiMin').value) || 0;
   const effective = getEffectiveSequence();
   const usingEffective = effective.length > 0;
   const total = computeTotalDistanceNm(usingEffective ? effective : points);
@@ -969,6 +1093,7 @@ function updateRangeSummary(points){
   const earlyExit = usingEffective && Math.abs(total - fullTotal) > 0.5;
   const pct = (total / maxRange) * 100;
   const over = total > maxRange;
+  const flightMin = taxiMin + (total / groundSpeed) * 60;
   div.style.display = 'block';
   div.style.borderLeft = `6px solid ${over ? '#e2596b' : '#4dbd8a'}`;
   div.style.background = over ? '#2a1216' : '#0f2318';
@@ -982,6 +1107,10 @@ function updateRangeSummary(points){
     <div style="margin-top:8px; height:8px; background:#1a2330; border-radius:4px; overflow:hidden;">
       <div style="height:100%; width:${Math.min(pct,100).toFixed(1)}%; background:${over ? '#e2596b' : '#4dbd8a'};"></div>
     </div>
+    <div style="margin-top:10px; display:flex; justify-content:space-between; align-items:baseline; flex-wrap:wrap; gap:8px; padding-top:9px; border-top:1px solid #1e2938;">
+      <div style="font-size:13.5px; font-weight:700; color:#dbe4ec;">\u2708 Total flight time: ${minutesToHM(flightMin)}</div>
+      <div style="font-size:12px; color:#8fa1b3;">at ${groundSpeed.toFixed(0)} kt${taxiMin ? ` + ${taxiMin.toFixed(0)} min taxi/climb` : ''}</div>
+    </div>
     ${earlyExit ? `<div style="margin-top:8px; font-size:12px; color:#8fa1b3;">Recalculated for the selected first/last point &mdash; full pattern would be ${fullTotal.toFixed(0)} nmi.</div>` : ''}
   `;
 }
@@ -989,7 +1118,7 @@ function updateRangeSummary(points){
 function renderTable(points){
   const tbody = document.getElementById('tbody');
   tbody.innerHTML = '';
-  for (const p of points){
+  points.forEach((p, i) => {
     const tr = document.createElement('tr');
     let tagClass = 'outer';
     if (p.type.startsWith('Inner')) tagClass='inner';
@@ -997,7 +1126,10 @@ function renderTable(points){
     else if (p.type.startsWith('Mid')) tagClass='mid';
     else if (p.type.startsWith('Center')) tagClass='center';
     else if (p.type.includes('Airport')) tagClass='airport';
+    const isAirport = p.type.includes('Airport');
     tr.innerHTML = `
+      <td>${isAirport ? '' : `<input type="checkbox" class="rowSelect" data-idx="${i}" style="width:auto; accent-color:var(--accent);">`}</td>
+      <td>${i+1}</td>
       <td><strong>${p.id}</strong></td>
       <td><span class="tag ${tagClass}">${p.type}</span></td>
       <td>${p.bearing===null?'&mdash;':p.bearing.toFixed(0)+'&deg;'}</td>
@@ -1006,7 +1138,27 @@ function renderTable(points){
       <td>${p.lon.toFixed(4)}&deg; (${decToDMS(p.lon,false)})</td>
     `;
     tbody.appendChild(tr);
-  }
+  });
+}
+
+function removeSelectedPoints(){
+  if (!lastGenState){ alert('Generate the pattern first.'); return; }
+  const checked = [...document.querySelectorAll('.rowSelect:checked')];
+  const status = document.getElementById('removeStatus');
+  if (checked.length === 0){ status.textContent = 'No points selected.'; return; }
+  const idxToRemove = new Set(checked.map(cb => Number(cb.dataset.idx)));
+  const points = lastGenState.points.filter((p, i) => !idxToRemove.has(i));
+  if (points.length < 2){ status.textContent = 'Can\u2019t remove that many \u2014 at least 2 points must remain.'; return; }
+
+  // update state and recalculate everything downstream: table, map, mileage, flight time, selectors
+  lastGenState.points = points;
+  lastPoints = points;
+  renderTable(points);
+  populateLastPointSelect(points);
+  renderMap(points, lastGenState.centerLat, lastGenState.centerLon, lastGenState.outerR, lastGenState.innerR, lastGenState.MID_FRAC, lastGenState.departure, lastGenState.arrival);
+  updateRangeSummary(points);
+  updateTextPreviews();
+  status.textContent = `Removed ${idxToRemove.size} point${idxToRemove.size===1?'':'s'} \u2014 ${points.length} remaining, renumbered sequentially (Seq column) and recalculated.`;
 }
 
 function populatePointSelect(selectId, points, fallback, preferLast){
@@ -1049,17 +1201,28 @@ function renderMap(points, centerLat, centerLon, outerR, innerR, MID_FRAC, depar
     L.polyline([ll(a), ll(b)], opts).addTo(layerGroup);
   }
 
-  const outerOrder = ['1','2','3','4','5','6','7','8','9','10','11','12'];
-  const innerOrder = ['17','18','19','20','13','14','15','16'];
+  const outerOrderFull = ['1','2','3','4','5','6','7','8','9','10','11','12'];
+  const innerOrderFull = ['17','18','19','20','13','14','15','16'];
+  // filter to only the labels still present after point removal, so consecutive remaining points
+  // connect directly to each other instead of leaving a gap where a removed point used to be
+  const outerOrder = outerOrderFull.filter(id => byId[id]);
+  const innerOrder = innerOrderFull.filter(id => byId[id]);
 
   for (let i=0;i<outerOrder.length-1;i++) drawLine(outerOrder[i], outerOrder[i+1], '#2f8f4e', 3);
-  for (let i=0;i<innerOrder.length;i++) drawLine(innerOrder[i], innerOrder[(i+1)%innerOrder.length], '#2f8f4e', 2.5);
+  if (innerOrder.length > 1){
+    for (let i=0;i<innerOrder.length;i++) drawLine(innerOrder[i], innerOrder[(i+1)%innerOrder.length], '#2f8f4e', 2.5);
+  }
 
   drawLine('17','CTR','#2f8f4e',2.5);
   drawLine('19','CTR','#2f8f4e',2.5);
   drawLine('13','CTR','#2f8f4e',2.5);
   drawLine('15','CTR','#2f8f4e',2.5);
-  drawLine('12','13','#2f8f4e',2.5); // the only outer-to-inner transition point
+  // outer-to-inner transition: connects 12 to 13 normally, but reconnects to whichever ring
+  // points are still actually present if either endpoint was removed
+  const outerExit = outerOrder[outerOrder.length-1];
+  const innerNumericPresent = INNER_ORDER.filter(id => byId[id]);
+  const innerEntry = innerNumericPresent[0];
+  if (outerExit && innerEntry) drawLine(outerExit, innerEntry, '#2f8f4e', 2.5);
 
   const fig4Vertices = points.filter(p => p.type.startsWith('Figure-Four'));
   const fig4Midpoints = points.filter(p => p.type.startsWith('Mid'));
@@ -1081,39 +1244,42 @@ function renderMap(points, centerLat, centerLon, outerR, innerR, MID_FRAC, depar
       const v = fig4Vertices.find(vv => Math.abs(vv.bearing - m.bearing) < 0.01);
       if (v) drawLine(m.id, v.id, '#1f6fb2', 1.8, '4,4');
     }
-    // connect the inner ring's last point to the figure-four's entry vertex (lowest new number)
+    // connect the inner ring's last point to the figure-four's entry vertex (lowest new number),
+    // reconnecting to whichever inner ring point is actually present if 20 itself was removed
     const entryVertex = fig4Vertices.reduce((min, p) => (Number(p.id) < Number(min.id) ? p : min), fig4Vertices[0]);
-    drawLine('20', entryVertex.id, '#2f8f4e', 2.5);
+    const innerNumericForFig4 = INNER_ORDER.filter(id => byId[id]);
+    const ringExitForFig4 = innerNumericForFig4[innerNumericForFig4.length-1];
+    if (ringExitForFig4) drawLine(ringExitForFig4, entryVertex.id, '#5fd4d6', 2.5);
   }
 
   for (const p of points){
     if (p.type.includes('Airport')) continue;
-    let bg='#4fb06b', border='#1e5c31', size=26, label=p.id;
-    if (p.id==='CTR'){ bg='#c62b2b'; border='#7a1616'; size=24; label='C'; }
-    else if (p.type.startsWith('Mid')){ bg='#e3a53f'; border='#8a5c10'; size=22; label='M'; }
-    else if (p.type.startsWith('Inner')){ bg='#63c17f'; border='#1e5c31'; size=24; }
-    else if (p.type.startsWith('Figure-Four')){ bg='#4a86d6'; border='#1f4f8a'; size=24; }
+    let bg='#0a1118', border='#5fd4d6', size=26, label=p.id;
+    if (p.id==='CTR'){ bg='#e8574a'; border='#e8574a'; size=20; label=''; }
+    else if (p.type.startsWith('Mid')){ bg='#0a1118'; border='#e8a13c'; size=20; label='M'; }
+    else if (p.type.startsWith('Inner')){ bg='#0a1118'; border='#5fd4d6'; size=24; }
+    else if (p.type.startsWith('Figure-Four')){ bg='#0a1118'; border='#f2437a'; size=24; }
 
     const bearingLine = p.bearing===null ? '' : (p.bearing.toFixed(0)+'&deg; / '+p.range.toFixed(1)+' nmi<br>');
     const tooltipHtml = '<strong>'+p.id+'</strong> &mdash; '+p.type+'<br>'+bearingLine+decToDMS(p.lat,true)+' '+decToDMS(p.lon,false);
 
     const marker = L.marker(ll(p), { icon: makeIcon(label, bg, border, size) }).addTo(layerGroup);
-    marker.bindTooltip(tooltipHtml, { direction:'top', offset:[0,-size/2] });
+    marker.bindTooltip(tooltipHtml, { className:'mono-tip', direction:'top', offset:[0,-size/2] });
   }
 
   if (departure){
     const dTooltip = '<strong>'+departure.id+'</strong> &mdash; Departure Airport<br>'+decToDMS(departure.lat,true)+' '+decToDMS(departure.lon,false);
-    L.marker([departure.lat, departure.lon], { icon: makeAirportIcon() }).addTo(layerGroup).bindTooltip(dTooltip, {direction:'top', offset:[0,-16]});
+    L.marker([departure.lat, departure.lon], { icon: makeAirportIcon('D') }).addTo(layerGroup).bindTooltip(dTooltip, {className:'mono-tip', direction:'top', offset:[0,-16]});
     const firstPointId = document.getElementById('firstPointSelect').value || '1';
     const startPt = byId[firstPointId] || byId['1']; // departure connects from whichever point is selected as "first point flown"
-    if (startPt) L.polyline([[departure.lat, departure.lon], [startPt.lat, startPt.lon]], { color:'#4a2fa8', weight:2, opacity:0.7, dashArray:'6,8' }).addTo(layerGroup);
+    if (startPt) L.polyline([[departure.lat, departure.lon], [startPt.lat, startPt.lon]], { color:'#e8a13c', weight:2, opacity:0.85, dashArray:'6,6' }).addTo(layerGroup);
   }
   if (arrival){
     const aTooltip = '<strong>'+arrival.id+'</strong> &mdash; Arrival Airport<br>'+decToDMS(arrival.lat,true)+' '+decToDMS(arrival.lon,false);
-    L.marker([arrival.lat, arrival.lon], { icon: makeAirportIcon() }).addTo(layerGroup).bindTooltip(aTooltip, {direction:'top', offset:[0,-16]});
+    L.marker([arrival.lat, arrival.lon], { icon: makeAirportIcon('A') }).addTo(layerGroup).bindTooltip(aTooltip, {className:'mono-tip', direction:'top', offset:[0,-16]});
     const lastPointId = document.getElementById('lastPointSelect').value || 'CTR';
     const endPt = byId[lastPointId] || byId['CTR']; // arrival connects from whichever point is selected as "last point flown"
-    if (endPt) L.polyline([[endPt.lat, endPt.lon], [arrival.lat, arrival.lon]], { color:'#4a2fa8', weight:2, opacity:0.7, dashArray:'6,8' }).addTo(layerGroup);
+    if (endPt) L.polyline([[endPt.lat, endPt.lon], [arrival.lat, arrival.lon]], { color:'#e8a13c', weight:2, opacity:0.85, dashArray:'6,6' }).addTo(layerGroup);
   }
 
   const bounds = L.latLngBounds(points.map(ll));
@@ -1124,30 +1290,16 @@ function renderMap(points, centerLat, centerLon, outerR, innerR, MID_FRAC, depar
   legendControl.onAdd = function(){
     const div = L.DomUtil.create('div', 'leaflet-legend');
     div.innerHTML = `
-      <span class="sw" style="background:#4fb06b;"></span>Outer ring &mdash; 90 nmi<br>
-      <span class="sw" style="background:#63c17f;"></span>Inner ring<br>
-      <span class="sw" style="background:#4a86d6;"></span>Figure-four vertex (2nd drop, on inner ring)<br>
-      <span class="sw" style="background:#e3a53f;"></span>Midpoint dropsonde<br>
-      <span class="sw" style="background:#c62b2b;"></span>Center fix<br>
-      <span class="sw" style="background:#4a2fa8; border-radius:3px;"></span>Departure / arrival airport
+      <span class="sw" style="background:#5fd4d6;"></span>Outer / inner ring<br>
+      <span class="sw" style="background:#f2437a;"></span>Figure-four vertex (2nd drop)<br>
+      <span class="sw" style="background:#e8a13c;"></span>Midpoint dropsonde<br>
+      <span class="sw" style="background:#e8574a;"></span>Center fix<br>
+      <span class="sw" style="background:#e8a13c; border-radius:3px;"></span>Departure / arrival airport
     `;
     return div;
   };
   legendControl.addTo(map);
 
-  const vwsDir = parseFloat(document.getElementById('vwsDir').value);
-  const vwsSpd = parseFloat(document.getElementById('vwsSpd').value);
-  if (shearControl){ map.removeControl(shearControl); shearControl = null; }
-  if (!isNaN(vwsDir) && !isNaN(vwsSpd)){
-    shearControl = L.control({position:'topleft'});
-    shearControl.onAdd = function(){
-      const div = L.DomUtil.create('div', 'shear-box');
-      const arrowRotation = (vwsDir + 180) % 360; // arrow points in direction shear is blowing TOWARD
-      div.innerHTML = `<span style="display:inline-block;transform:rotate(${arrowRotation}deg);font-size:18px;">&#8593;</span> VWS &mdash; ${vwsSpd} kt`;
-      return div;
-    };
-    shearControl.addTo(map);
-  }
 }
 
 function downloadCSV(){
@@ -1165,6 +1317,7 @@ function downloadCSV(){
   a.href = url; a.download = 'giv_fix_list.csv';
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   URL.revokeObjectURL(url);
+  showToast('Fix list downloaded');
 }
 
 // --- HRD-style drops/turns export -----------------------------------------
@@ -1177,7 +1330,7 @@ function padL(str, width){ str = String(str); return str.length>=width ? str : '
 function padR(str, width){ str = String(str); return str.length>=width ? str : str + ' '.repeat(width-str.length); }
 
 function buildExportRows(){
-  const groundSpeed = parseFloat(document.getElementById('groundSpeed').value) || 400;
+  const groundSpeed = parseFloat(document.getElementById('groundSpeed').value) || 450;
   const taxiMin = parseFloat(document.getElementById('taxiMin').value) || 0;
   const pts = getEffectiveSequence();
 
@@ -1205,8 +1358,8 @@ function buildExportRows(){
   return rows;
 }
 
-function downloadDropsTxt(){
-  if (!lastGenState){ alert('Generate the pattern first.'); return; }
+function buildDropsText(){
+  if (!lastGenState) return '';
   const missionName = (document.getElementById('missionName').value || 'STORM').toUpperCase();
   const tail = document.getElementById('aircraftTail').value || '';
   const takeoff = document.getElementById('takeoffStr').value || '';
@@ -1229,7 +1382,21 @@ function downloadDropsTxt(){
     out += ` ${padR(r.label,5)} ${padL(decToDM(r.lat),6)}   ${padL(decToDM(r.lon),6)}   ${padL(radAzm,9)}   ${padL(minutesToHM(r.elapsedMin),5)}\n`;
   }
   out += ' ------------------------------------------\n';
+  return out;
+}
 
+function updateTextPreviews(){
+  const dropsEl = document.getElementById('dropsPreview');
+  const turnsEl = document.getElementById('turnsPreview');
+  if (!lastGenState){ dropsEl.value = ''; turnsEl.value = ''; return; }
+  dropsEl.value = buildDropsText();
+  turnsEl.value = buildTurnsText();
+}
+
+function downloadDropsTxt(){
+  if (!lastGenState){ alert('Generate the pattern first.'); return; }
+  const missionName = (document.getElementById('missionName').value || 'STORM').toUpperCase();
+  const out = buildDropsText();
   const blob = new Blob([out], {type:'text/plain'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -1238,8 +1405,8 @@ function downloadDropsTxt(){
   URL.revokeObjectURL(url);
 }
 
-function downloadTurnsTxt(){
-  if (!lastGenState){ alert('Generate the pattern first.'); return; }
+function buildTurnsText(){
+  if (!lastGenState) return '';
   const missionName = (document.getElementById('missionName').value || 'STORM').toUpperCase();
   const tail = document.getElementById('aircraftTail').value || '';
   const takeoff = document.getElementById('takeoffStr').value || '';
@@ -1281,7 +1448,13 @@ function downloadTurnsTxt(){
   out += ` Time to IP:  ${ipTime ? minutesToHM(ipTime.elapsedMin) : ''}\n`;
   out += ` Mission Duration:  ${lastRow ? minutesToHM(lastRow.elapsedMin) : ''}\n`;
   out += ' ************************************************************************\n';
+  return out;
+}
 
+function downloadTurnsTxt(){
+  if (!lastGenState){ alert('Generate the pattern first.'); return; }
+  const missionName = (document.getElementById('missionName').value || 'STORM').toUpperCase();
+  const out = buildTurnsText();
   const blob = new Blob([out], {type:'text/plain'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -1320,7 +1493,7 @@ function copyWindyWaypoints(){
   const status = document.getElementById('windyStatus');
   const url = buildWindyUrl();
   if (!url){ status.textContent = 'Nothing to copy \u2014 generate the pattern first.'; return; }
-  const done = () => { status.textContent = 'Copied the Windy route URL to clipboard \u2014 paste it into your browser.'; };
+  const done = () => { status.textContent = 'Copied the Windy route URL to clipboard \u2014 paste it into your browser.'; showToast('Copied to clipboard'); };
   const fail = () => { status.textContent = 'Clipboard blocked by the browser \u2014 copy this URL manually:\n' + url; };
   if (navigator.clipboard && navigator.clipboard.writeText){
     navigator.clipboard.writeText(url).then(done).catch(fail);
@@ -1332,34 +1505,178 @@ function copyWindyWaypoints(){
 document.getElementById('windyOpenBtn').addEventListener('click', openWindy);
 document.getElementById('windyCopyBtn').addEventListener('click', copyWindyWaypoints);
 
+// --- Shared aviation coordinate token (ICAO-style DDMMSSN/DDDMMSSW fix format) --------------
+
+function toAviationCoordToken(lat, lon, withSlash){
+  const latHemi = lat >= 0 ? 'N' : 'S';
+  const lonHemi = lon >= 0 ? 'E' : 'W';
+  const aLat = Math.abs(lat), aLon = Math.abs(lon);
+  function dms(deg, degDigits){
+    let d = Math.floor(deg);
+    let mFull = (deg - d) * 60;
+    let m = Math.floor(mFull);
+    let s = Math.round((mFull - m) * 60);
+    if (s >= 60){ s -= 60; m += 1; }
+    if (m >= 60){ m -= 60; d += 1; }
+    return String(d).padStart(degDigits, '0') + String(m).padStart(2, '0') + String(s).padStart(2, '0');
+  }
+  const latStr = dms(aLat, 2) + latHemi;
+  const lonStr = dms(aLon, 3) + lonHemi;
+  return withSlash ? `${latStr}/${lonStr}` : `${latStr}${lonStr}`;
+}
+
+// Builds the route token list (departure ident, every point as a coord fix, arrival ident) —
+// shared by SkyVector and ForeFlight, which (unlike Windy) are real route-planning tools that
+// handle airports and duplicate waypoints natively, so nothing needs to be excluded here.
+function buildRouteTokens(withSlash){
+  if (!lastGenState) return null;
+  const seq = getEffectiveSequence();
+  if (seq.length === 0) return null;
+  return seq.map(p => p.type.includes('Airport') ? p.id : toAviationCoordToken(p.lat, p.lon, withSlash));
+}
+
+// --- SkyVector export ---------------------------------------------------------------------
+
+function buildSkyVectorUrl(){
+  const tokens = buildRouteTokens(false); // SkyVector wants the packed fix format, no slash
+  if (!tokens || tokens.length < 2) return null;
+  const { centerLat, centerLon } = lastGenState;
+  const fpl = encodeURIComponent(tokens.join(' '));
+  return `https://skyvector.com/?ll=${centerLat.toFixed(4)},${centerLon.toFixed(4)}&chart=301&zoom=7&fpl=${fpl}`;
+}
+
+function openSkyVector(){
+  if (!lastGenState){ alert('Generate the pattern first.'); return; }
+  const url = buildSkyVectorUrl();
+  if (!url){ document.getElementById('skyvectorStatus').textContent = 'Need at least 2 points to build a route.'; return; }
+  window.open(url, '_blank');
+}
+
+function copySkyVectorUrl(){
+  if (!lastGenState){ alert('Generate the pattern first.'); return; }
+  const status = document.getElementById('skyvectorStatus');
+  const url = buildSkyVectorUrl();
+  if (!url){ status.textContent = 'Nothing to copy \u2014 generate the pattern first.'; return; }
+  const done = () => { status.textContent = 'Copied the SkyVector URL to clipboard.'; showToast('Copied to clipboard'); };
+  const fail = () => { status.textContent = 'Clipboard blocked \u2014 copy this URL manually:\n' + url; };
+  if (navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(url).then(done).catch(fail);
+  } else { fail(); }
+}
+
+document.getElementById('skyvectorOpenBtn').addEventListener('click', openSkyVector);
+document.getElementById('skyvectorCopyBtn').addEventListener('click', copySkyVectorUrl);
+
+// --- ForeFlight export ---------------------------------------------------------------------
+
+function buildForeFlightRouteString(){
+  const tokens = buildRouteTokens(true); // ForeFlight's documented fix format includes the slash
+  if (!tokens || tokens.length < 2) return null;
+  return tokens.join(' ');
+}
+
+function openForeFlight(){
+  if (!lastGenState){ alert('Generate the pattern first.'); return; }
+  const route = buildForeFlightRouteString();
+  const status = document.getElementById('foreflightStatus');
+  if (!route){ status.textContent = 'Need at least 2 points to build a route.'; return; }
+  const url = `foreflightmobile://maps/search?q=${encodeURIComponent(route)}`;
+  window.location.href = url;
+  status.textContent = 'Sent to ForeFlight Mobile \u2014 if nothing happened, ForeFlight isn\u2019t installed on this device.';
+}
+
+function copyForeFlightRoute(){
+  if (!lastGenState){ alert('Generate the pattern first.'); return; }
+  const status = document.getElementById('foreflightStatus');
+  const route = buildForeFlightRouteString();
+  if (!route){ status.textContent = 'Nothing to copy \u2014 generate the pattern first.'; return; }
+  const done = () => { status.textContent = 'Copied the route string \u2014 paste into ForeFlight\u2019s FPL editor.'; showToast('Copied to clipboard'); };
+  const fail = () => { status.textContent = 'Clipboard blocked \u2014 copy this manually:\n' + route; };
+  if (navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(route).then(done).catch(fail);
+  } else { fail(); }
+}
+
+document.getElementById('foreflightOpenBtn').addEventListener('click', openForeFlight);
+document.getElementById('foreflightCopyBtn').addEventListener('click', copyForeFlightRoute);
+
+// --- Onboard 800 UI export ---------------------------------------------------------------
+// Fixed-width format reverse-engineered from a sample provided by the user:
+//   " 1 16 27 -115 01      "
+// index(2, right-just) SP latDeg(2) SP latMin(2) SP lonDeg(sign+3) SP lonMin(2) + 6 trailing spaces
+// Latitude has no sign shown when north (only gets a "-" if south); longitude always shows
+// a sign. No published spec exists for this — matched as closely as possible to the sample.
+
+function to800UiRow(index, lat, lon){
+  function splitDegMin(value){
+    const sign = value < 0 ? '-' : '';
+    const a = Math.abs(value);
+    let deg = Math.floor(a);
+    let min = Math.round((a - deg) * 60);
+    if (min >= 60){ min -= 60; deg += 1; }
+    return { sign, deg, min };
+  }
+  const latP = splitDegMin(lat);
+  const lonP = splitDegMin(lon);
+  const idxStr = String(index);
+  const latDegStr = latP.sign + String(latP.deg).padStart(2, '0');
+  const latMinStr = String(latP.min).padStart(2, '0');
+  const lonDegStr = lonP.sign + String(lonP.deg).padStart(3, '0');
+  const lonMinStr = String(lonP.min).padStart(2, '0');
+  return `${idxStr} ${latDegStr} ${latMinStr} ${lonDegStr} ${lonMinStr}      `;
+}
+
+function download800UiPoints(){
+  if (!lastGenState){ alert('Generate the pattern first.'); return; }
+  const seq = getEffectiveSequence().filter(p => !p.type.includes('Airport'));
+  if (seq.length === 0){ alert('No points to export.'); return; }
+  const lines = seq.map((p, i) => to800UiRow(i + 1, p.lat, p.lon));
+  const out = lines.join('\n') + '\n';
+  const missionName = (document.getElementById('missionName').value || 'STORM').toLowerCase();
+  const blob = new Blob([out], {type:'text/plain'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `${missionName}_800ui.txt`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+document.getElementById('ui800Btn').addEventListener('click', download800UiPoints);
+
 document.getElementById('genBtn').addEventListener('click', generate);
+document.getElementById('removeSelectedBtn').addEventListener('click', removeSelectedPoints);
 document.getElementById('firstPointSelect').addEventListener('change', () => {
   if (!lastGenState) return;
   const s = lastGenState;
   renderMap(s.points, s.centerLat, s.centerLon, s.outerR, s.innerR, s.MID_FRAC, s.departure, s.arrival);
   updateRangeSummary(s.points);
+  updateTextPreviews();
 });
 document.getElementById('lastPointSelect').addEventListener('change', () => {
   if (!lastGenState) return;
   const s = lastGenState;
   renderMap(s.points, s.centerLat, s.centerLon, s.outerR, s.innerR, s.MID_FRAC, s.departure, s.arrival);
   updateRangeSummary(s.points);
+  updateTextPreviews();
 });
 document.getElementById('csvBtn').addEventListener('click', downloadCSV);
 document.getElementById('maxRangeNm').addEventListener('input', () => {
   if (lastGenState) updateRangeSummary(lastGenState.points);
+  updateTextPreviews();
 });
+document.getElementById('groundSpeed').addEventListener('input', () => {
+  if (lastGenState) updateRangeSummary(lastGenState.points);
+  updateTextPreviews();
+});
+document.getElementById('taxiMin').addEventListener('input', () => {
+  if (lastGenState) updateRangeSummary(lastGenState.points);
+  updateTextPreviews();
+});
+document.getElementById('missionName').addEventListener('input', updateTextPreviews);
+document.getElementById('aircraftTail').addEventListener('input', updateTextPreviews);
+document.getElementById('takeoffStr').addEventListener('input', updateTextPreviews);
 document.getElementById('dropsBtn').addEventListener('click', downloadDropsTxt);
 document.getElementById('turnsBtn').addEventListener('click', downloadTurnsTxt);
-
-document.getElementById('preset').addEventListener('change', (e) => {
-  const v = e.target.value;
-  if (v === 'nominal'){ document.getElementById('outerR').value = 90; document.getElementById('innerR').value = 60; }
-  else if (v === 'expanded'){ document.getElementById('outerR').value = 120; document.getElementById('innerR').value = 90; }
-});
-function markCustomIfEdited(){ document.getElementById('preset').value = 'custom'; }
-document.getElementById('outerR').addEventListener('input', markCustomIfEdited);
-document.getElementById('innerR').addEventListener('input', markCustomIfEdited);
 
 function updateFig4RotHint(){
   const showInner = document.getElementById('showInner').checked;
