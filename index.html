@@ -377,6 +377,7 @@
       <span id="chartMeta" style="color:var(--muted2);"></span>
     </div>
     <div id="map"></div>
+    <div class="hint" style="margin-top:8px;">Click any point (except the center fix) to remove it, or drag and hold to reposition it &mdash; bearing/range recalculate from the center automatically, and the fix list, mileage, and exports all update. You can also remove points via the checkboxes in the Fix List below. Regenerating the pattern resets any drags or removals.</div>
   </div>
 
   <div class="chart-card">
@@ -436,6 +437,11 @@
   <div class="chart-card">
     <h2 style="margin-top:0;">Export for Onboard 800 UI</h2>
     <button id="ui800Btn" class="secondary" style="background:#1f3a2e; color:#bdf0d5; border-color:#2f5a45;">Download 800 UI Points (.txt)</button>
+  </div>
+
+  <div class="chart-card">
+    <h2 style="margin-top:0;">Export to KML</h2>
+    <button id="kmlBtn" class="secondary" style="background:#2f2a12; color:#f0dfa1; border-color:#5a5127;">Download KML (Google Earth)</button>
   </div>
   </div>
 
@@ -802,6 +808,18 @@ function destPoint(lat0, lon0, bearingDeg, distNm){
   return { lat: toDeg(φ2), lon: ((toDeg(λ2)+540)%360)-180 };
 }
 
+// inverse of destPoint: given a center and a point, recover the bearing (deg true) and range (nmi)
+// from the center to that point — used after dragging a marker to a custom position
+function bearingRangeFromCenter(centerLat, centerLon, lat, lon){
+  const φ1=toRad(centerLat), φ2=toRad(lat);
+  const Δλ=toRad(lon-centerLon);
+  const y = Math.sin(Δλ)*Math.cos(φ2);
+  const x = Math.cos(φ1)*Math.sin(φ2) - Math.sin(φ1)*Math.cos(φ2)*Math.cos(Δλ);
+  const bearing = ((toDeg(Math.atan2(y,x)))+360)%360;
+  const range = haversineNm(centerLat, centerLon, lat, lon);
+  return { bearing, range };
+}
+
 function showToast(msg){
   const t = document.getElementById('toast');
   t.textContent = msg;
@@ -861,6 +879,7 @@ let lastGenState = null; // stores the last generated points + params so the "la
 let lastPoints = null;
 let map = null;
 let layerGroup = null;
+let isCustomized = false; // true once a point has been removed or dragged — switches the map to a simple connect-the-dots path instead of the structural ring/spoke drawing
 let legendControl = null;
 
 function initMap(){
@@ -905,6 +924,7 @@ function readAirport(prefix){
 }
 
 function generate(){
+  isCustomized = false;
   const latIn = parseFloat(document.getElementById('lat').value);
   const lonIn = parseFloat(document.getElementById('lon').value);
   const latHemi = document.getElementById('latHemi').value;
@@ -1109,6 +1129,7 @@ function updateRangeSummary(points){
 function renderTable(points){
   const tbody = document.getElementById('tbody');
   tbody.innerHTML = '';
+  let seqCounter = 0;
   points.forEach((p, i) => {
     const tr = document.createElement('tr');
     let tagClass = 'outer';
@@ -1118,10 +1139,11 @@ function renderTable(points){
     else if (p.type.startsWith('Center')) tagClass='center';
     else if (p.type.includes('Airport')) tagClass='airport';
     const isAirport = p.type.includes('Airport');
+    if (!isAirport) seqCounter += 1;
     tr.innerHTML = `
       <td>${isAirport ? '' : `<input type="checkbox" class="rowSelect" data-idx="${i}" style="width:auto; accent-color:var(--accent);">`}</td>
-      <td>${i+1}</td>
-      <td><strong>${p.id}</strong></td>
+      <td>${isAirport ? '&mdash;' : seqCounter}</td>
+      <td><strong title="${isAirport ? p.id : 'Originally '+p.id+' \u2014 '+p.type}">${isAirport ? p.id : seqCounter}</strong></td>
       <td><span class="tag ${tagClass}">${p.type}</span></td>
       <td>${p.bearing===null?'&mdash;':p.bearing.toFixed(0)+'&deg;'}</td>
       <td>${p.range===null?'&mdash;':p.range.toFixed(1)}</td>
@@ -1141,6 +1163,7 @@ function removeSelectedPoints(){
   const points = lastGenState.points.filter((p, i) => !idxToRemove.has(i));
   if (points.length < 2){ status.textContent = 'Can\u2019t remove that many \u2014 at least 2 points must remain.'; return; }
 
+  isCustomized = true;
   // update state and recalculate everything downstream: table, map, mileage, flight time, selectors
   lastGenState.points = points;
   lastPoints = points;
@@ -1156,11 +1179,13 @@ function populatePointSelect(selectId, points, fallback, preferLast){
   const sel = document.getElementById(selectId);
   const prevValue = sel.value || fallback;
   sel.innerHTML = '';
+  let seqCounter = 0;
   for (const p of points){
     if (p.type.includes('Airport')) continue;
+    seqCounter += 1;
     const opt = document.createElement('option');
     opt.value = p.id;
-    opt.textContent = p.id + ' \u2014 ' + p.type;
+    opt.textContent = '#' + seqCounter + ' \u2014 ' + p.type;
     sel.appendChild(opt);
   }
   const hasPrev = [...sel.options].some(o => o.value === prevValue);
@@ -1179,7 +1204,7 @@ function populateLastPointSelect(points){
   populatePointSelect('lastPointSelect', points, 'CTR', true);
 }
 
-function renderMap(points, centerLat, centerLon, outerR, innerR, MID_FRAC, departure, arrival){
+function renderMap(points, centerLat, centerLon, outerR, innerR, MID_FRAC, departure, arrival, skipFitBounds){
   layerGroup.clearLayers();
   const byId = {}; for (const p of points) byId[p.id]=p;
 
@@ -1192,89 +1217,140 @@ function renderMap(points, centerLat, centerLon, outerR, innerR, MID_FRAC, depar
     L.polyline([ll(a), ll(b)], opts).addTo(layerGroup);
   }
 
-  const outerOrderFull = ['1','2','3','4','5','6','7','8','9','10','11','12'];
-  const innerOrderFull = ['17','18','19','20','13','14','15','16'];
-  // filter to only the labels still present after point removal, so consecutive remaining points
-  // connect directly to each other instead of leaving a gap where a removed point used to be
-  const outerOrder = outerOrderFull.filter(id => byId[id]);
-  const innerOrder = innerOrderFull.filter(id => byId[id]);
+  if (!isCustomized){
+    const outerOrderFull = ['1','2','3','4','5','6','7','8','9','10','11','12'];
+    const innerOrderFull = ['17','18','19','20','13','14','15','16'];
+    // filter to only the labels still present after point removal, so consecutive remaining points
+    // connect directly to each other instead of leaving a gap where a removed point used to be
+    const outerOrder = outerOrderFull.filter(id => byId[id]);
+    const innerOrder = innerOrderFull.filter(id => byId[id]);
 
-  for (let i=0;i<outerOrder.length-1;i++) drawLine(outerOrder[i], outerOrder[i+1], '#2f8f4e', 3);
-  if (innerOrder.length > 1){
-    for (let i=0;i<innerOrder.length;i++) drawLine(innerOrder[i], innerOrder[(i+1)%innerOrder.length], '#2f8f4e', 2.5);
+    for (let i=0;i<outerOrder.length-1;i++) drawLine(outerOrder[i], outerOrder[i+1], '#2f8f4e', 3);
+    if (innerOrder.length > 1){
+      for (let i=0;i<innerOrder.length;i++) drawLine(innerOrder[i], innerOrder[(i+1)%innerOrder.length], '#2f8f4e', 2.5);
+    }
+
+    // outer-to-inner transition: connects 12 to 13 normally, but reconnects to whichever ring
+    // points are still actually present if either endpoint was removed
+    const outerExit = outerOrder[outerOrder.length-1];
+    const innerNumericPresent = INNER_ORDER.filter(id => byId[id]);
+    const innerEntry = innerNumericPresent[0];
+    if (outerExit && innerEntry) drawLine(outerExit, innerEntry, '#2f8f4e', 2.5);
+
+    const fig4Vertices = points.filter(p => p.type.startsWith('Figure-Four'));
+    const fig4Midpoints = points.filter(p => p.type.startsWith('Mid'));
+    const hasCtr = points.some(p => p.type === 'Center Fix');
+
+    if (hasCtr){
+      // inner ring off: explicit enter -> cross(center) -> over -> cross(center) -> exit chain
+      const fig4Chain = points.filter(p => p.type.startsWith('Figure-Four') || p.type.startsWith('Mid') || p.type === 'Center Fix');
+      for (let i=0; i<fig4Chain.length-1; i++){
+        drawLine(fig4Chain[i].id, fig4Chain[i+1].id, '#1f6fb2', 2.8);
+      }
+    } else if (fig4Vertices.length){
+      // inner ring on: clean direct vertex-to-vertex path (NW -> NE -> SW -> SE); midpoints are
+      // independent radial spurs off their own vertex, not part of the connecting path
+      for (let i=0; i<fig4Vertices.length-1; i++){
+        drawLine(fig4Vertices[i].id, fig4Vertices[i+1].id, '#1f6fb2', 2.8);
+      }
+      for (const m of fig4Midpoints){
+        const v = fig4Vertices.find(vv => Math.abs(vv.bearing - m.bearing) < 0.01);
+        if (v) drawLine(m.id, v.id, '#1f6fb2', 1.8, '4,4');
+      }
+      // connect the inner ring's last point to the figure-four's entry vertex (lowest new number),
+      // reconnecting to whichever inner ring point is actually present if 20 itself was removed
+      const entryVertex = fig4Vertices.reduce((min, p) => (Number(p.id) < Number(min.id) ? p : min), fig4Vertices[0]);
+      const innerNumericForFig4 = INNER_ORDER.filter(id => byId[id]);
+      const ringExitForFig4 = innerNumericForFig4[innerNumericForFig4.length-1];
+      if (ringExitForFig4) drawLine(ringExitForFig4, entryVertex.id, '#5fd4d6', 2.5);
+    }
+  } else {
+    // pattern has been manually edited (a point removed or dragged) — the structural ring/spoke
+    // logic above assumes the pristine generated pattern and can produce confusing leftover
+    // connections once points are missing, so just connect the remaining points in flight order
+    const dropPoints = points.filter(p => !p.type.includes('Airport'));
+    for (let i=0; i<dropPoints.length-1; i++){
+      drawLine(dropPoints[i].id, dropPoints[i+1].id, '#2f8f4e', 2.5);
+    }
   }
 
-  drawLine('17','CTR','#2f8f4e',2.5);
-  drawLine('19','CTR','#2f8f4e',2.5);
-  drawLine('13','CTR','#2f8f4e',2.5);
-  drawLine('15','CTR','#2f8f4e',2.5);
-  // outer-to-inner transition: connects 12 to 13 normally, but reconnects to whichever ring
-  // points are still actually present if either endpoint was removed
-  const outerExit = outerOrder[outerOrder.length-1];
-  const innerNumericPresent = INNER_ORDER.filter(id => byId[id]);
-  const innerEntry = innerNumericPresent[0];
-  if (outerExit && innerEntry) drawLine(outerExit, innerEntry, '#2f8f4e', 2.5);
-
-  const fig4Vertices = points.filter(p => p.type.startsWith('Figure-Four'));
-  const fig4Midpoints = points.filter(p => p.type.startsWith('Mid'));
-  const hasCtr = points.some(p => p.type === 'Center Fix');
-
-  if (hasCtr){
-    // inner ring off: explicit enter -> cross(center) -> over -> cross(center) -> exit chain
-    const fig4Chain = points.filter(p => p.type.startsWith('Figure-Four') || p.type.startsWith('Mid') || p.type === 'Center Fix');
-    for (let i=0; i<fig4Chain.length-1; i++){
-      drawLine(fig4Chain[i].id, fig4Chain[i+1].id, '#1f6fb2', 2.8);
-    }
-  } else if (fig4Vertices.length){
-    // inner ring on: clean direct vertex-to-vertex path (NW -> NE -> SW -> SE); midpoints are
-    // independent radial spurs off their own vertex, not part of the connecting path
-    for (let i=0; i<fig4Vertices.length-1; i++){
-      drawLine(fig4Vertices[i].id, fig4Vertices[i+1].id, '#1f6fb2', 2.8);
-    }
-    for (const m of fig4Midpoints){
-      const v = fig4Vertices.find(vv => Math.abs(vv.bearing - m.bearing) < 0.01);
-      if (v) drawLine(m.id, v.id, '#1f6fb2', 1.8, '4,4');
-    }
-    // connect the inner ring's last point to the figure-four's entry vertex (lowest new number),
-    // reconnecting to whichever inner ring point is actually present if 20 itself was removed
-    const entryVertex = fig4Vertices.reduce((min, p) => (Number(p.id) < Number(min.id) ? p : min), fig4Vertices[0]);
-    const innerNumericForFig4 = INNER_ORDER.filter(id => byId[id]);
-    const ringExitForFig4 = innerNumericForFig4[innerNumericForFig4.length-1];
-    if (ringExitForFig4) drawLine(ringExitForFig4, entryVertex.id, '#5fd4d6', 2.5);
-  }
-
-  for (const p of points){
-    if (p.type.includes('Airport')) continue;
-    let bg='#0a1118', border='#5fd4d6', size=26, label=p.id;
-    if (p.id==='CTR'){ bg='#e8574a'; border='#e8574a'; size=20; label=''; }
-    else if (p.type.startsWith('Mid')){ bg='#0a1118'; border='#e8a13c'; size=20; label='M'; }
+  let mapSeqCounter = 0;
+  points.forEach((p, idx) => {
+    if (p.type.includes('Airport')) return;
+    mapSeqCounter += 1;
+    let bg='#0a1118', border='#5fd4d6', size=26;
+    const isCenter = p.id==='CTR';
+    if (isCenter){ bg='#e8574a'; border='#e8574a'; size=22; }
+    else if (p.type.startsWith('Mid')){ bg='#0a1118'; border='#e8a13c'; size=20; }
     else if (p.type.startsWith('Inner')){ bg='#0a1118'; border='#5fd4d6'; size=24; }
     else if (p.type.startsWith('Figure-Four')){ bg='#0a1118'; border='#f2437a'; size=24; }
+    const label = mapSeqCounter; // matches the Fix List's renumbered Seq/Pt columns exactly
 
     const bearingLine = p.bearing===null ? '' : (p.bearing.toFixed(0)+'&deg; / '+p.range.toFixed(1)+' nmi<br>');
-    const tooltipHtml = '<strong>'+p.id+'</strong> &mdash; '+p.type+'<br>'+bearingLine+decToDMS(p.lat,true)+' '+decToDMS(p.lon,false);
+    const actionHint = isCenter ? '' : '<br><em style="color:var(--muted);">click to remove &middot; drag to reposition</em>';
+    const tooltipHtml = '<strong>#'+mapSeqCounter+'</strong> <span style="color:var(--muted);">(originally '+p.id+')</span> &mdash; '+p.type+'<br>'+bearingLine+decToDMS(p.lat,true)+' '+decToDMS(p.lon,false)+actionHint;
 
-    const marker = L.marker(ll(p), { icon: makeIcon(label, bg, border, size) }).addTo(layerGroup);
+    const marker = L.marker(ll(p), { icon: makeIcon(label, bg, border, size), draggable: !isCenter }).addTo(layerGroup);
     marker.bindTooltip(tooltipHtml, { className:'mono-tip', direction:'top', offset:[0,-size/2] });
-  }
+    if (!isCenter){
+      let didDrag = false;
+      marker.on('dragstart', () => { didDrag = true; });
+      marker.on('dragend', (e) => {
+        const { lat, lng } = e.target.getLatLng();
+        p.lat = lat; p.lon = lng;
+        if (p.range !== null){
+          const br = bearingRangeFromCenter(centerLat, centerLon, lat, lng);
+          p.bearing = br.bearing; p.range = br.range;
+        }
+        isCustomized = true;
+        handlePointEdited();
+      });
+      marker.on('click', () => {
+        if (didDrag){ didDrag = false; return; } // a drag just ended — don't also remove
+        removeMapPoint(idx);
+      });
+    }
+  });
 
   if (departure){
-    const dTooltip = '<strong>'+departure.id+'</strong> &mdash; Departure Airport<br>'+decToDMS(departure.lat,true)+' '+decToDMS(departure.lon,false);
-    L.marker([departure.lat, departure.lon], { icon: makeAirportIcon('D') }).addTo(layerGroup).bindTooltip(dTooltip, {className:'mono-tip', direction:'top', offset:[0,-16]});
+    const dTooltip = '<strong>'+departure.id+'</strong> &mdash; Departure Airport<br>'+decToDMS(departure.lat,true)+' '+decToDMS(departure.lon,false)+'<br><em style="color:var(--muted);">drag to reposition</em>';
+    const depMarker = L.marker([departure.lat, departure.lon], { icon: makeAirportIcon('D'), draggable: true }).addTo(layerGroup);
+    depMarker.bindTooltip(dTooltip, {className:'mono-tip', direction:'top', offset:[0,-16]});
+    depMarker.on('dragend', (e) => {
+      const { lat, lng } = e.target.getLatLng();
+      departure.lat = lat; departure.lon = lng;
+      document.getElementById('depLat').value = Math.abs(lat).toFixed(4);
+      document.getElementById('depLon').value = Math.abs(lng).toFixed(4);
+      document.getElementById('depLatHemi').value = lat >= 0 ? 'N' : 'S';
+      document.getElementById('depLonHemi').value = lng >= 0 ? 'E' : 'W';
+      handlePointEdited();
+    });
     const firstPointId = document.getElementById('firstPointSelect').value || '1';
     const startPt = byId[firstPointId] || byId['1']; // departure connects from whichever point is selected as "first point flown"
     if (startPt) L.polyline([[departure.lat, departure.lon], [startPt.lat, startPt.lon]], { color:'#e8a13c', weight:2, opacity:0.85, dashArray:'6,6' }).addTo(layerGroup);
   }
   if (arrival){
-    const aTooltip = '<strong>'+arrival.id+'</strong> &mdash; Arrival Airport<br>'+decToDMS(arrival.lat,true)+' '+decToDMS(arrival.lon,false);
-    L.marker([arrival.lat, arrival.lon], { icon: makeAirportIcon('A') }).addTo(layerGroup).bindTooltip(aTooltip, {className:'mono-tip', direction:'top', offset:[0,-16]});
+    const aTooltip = '<strong>'+arrival.id+'</strong> &mdash; Arrival Airport<br>'+decToDMS(arrival.lat,true)+' '+decToDMS(arrival.lon,false)+'<br><em style="color:var(--muted);">drag to reposition</em>';
+    const arrMarker = L.marker([arrival.lat, arrival.lon], { icon: makeAirportIcon('A'), draggable: true }).addTo(layerGroup);
+    arrMarker.bindTooltip(aTooltip, {className:'mono-tip', direction:'top', offset:[0,-16]});
+    arrMarker.on('dragend', (e) => {
+      const { lat, lng } = e.target.getLatLng();
+      arrival.lat = lat; arrival.lon = lng;
+      document.getElementById('arrLat').value = Math.abs(lat).toFixed(4);
+      document.getElementById('arrLon').value = Math.abs(lng).toFixed(4);
+      document.getElementById('arrLatHemi').value = lat >= 0 ? 'N' : 'S';
+      document.getElementById('arrLonHemi').value = lng >= 0 ? 'E' : 'W';
+      handlePointEdited();
+    });
     const lastPointId = document.getElementById('lastPointSelect').value || 'CTR';
     const endPt = byId[lastPointId] || byId['CTR']; // arrival connects from whichever point is selected as "last point flown"
     if (endPt) L.polyline([[endPt.lat, endPt.lon], [arrival.lat, arrival.lon]], { color:'#e8a13c', weight:2, opacity:0.85, dashArray:'6,6' }).addTo(layerGroup);
   }
 
-  const bounds = L.latLngBounds(points.map(ll));
-  map.fitBounds(bounds, { padding:[30,30] });
+  if (!skipFitBounds){
+    const bounds = L.latLngBounds(points.map(ll));
+    map.fitBounds(bounds, { padding:[30,30] });
+  }
 
   if (legendControl) map.removeControl(legendControl);
   legendControl = L.control({position:'bottomleft'});
@@ -1314,7 +1390,7 @@ function downloadCSV(){
 // --- HRD-style drops/turns export -----------------------------------------
 
 function dropLabel(id){
-  return /^\d+$/.test(id) ? id + 'S' : id; // pure numeral points get the "S" (sonde) suffix, e.g. 1 -> 1S
+  return id; // plain point number, no suffix
 }
 
 function padL(str, width){ str = String(str); return str.length>=width ? str : ' '.repeat(width-str.length) + str; }
@@ -1325,7 +1401,7 @@ function buildExportRows(){
   const pts = getEffectiveSequence();
 
   const rows = [];
-  let totalNm = 0, elapsedMin = 0;
+  let totalNm = 0, elapsedMin = 0, seqCounter = 0;
   for (let i=0; i<pts.length; i++){
     const p = pts[i];
     let legNm = 0;
@@ -1337,8 +1413,9 @@ function buildExportRows(){
       elapsedMin += (legNm / groundSpeed) * 60;
     }
     const isAirport = p.type.includes('Airport');
+    if (!isAirport) seqCounter += 1;
     rows.push({
-      label: isAirport ? p.id : dropLabel(p.id),
+      label: isAirport ? p.id : dropLabel(String(seqCounter)),
       isAirport,
       lat: p.lat, lon: p.lon,
       rad: p.range, azm: p.bearing,
@@ -1373,6 +1450,31 @@ function buildDropsText(){
   }
   out += ' ------------------------------------------\n';
   return out;
+}
+
+function removeMapPoint(idx){
+  if (!lastGenState) return;
+  const points = lastGenState.points.filter((p, i) => i !== idx);
+  if (points.length < 2){ showToast('At least 2 points must remain'); return; }
+  isCustomized = true;
+  lastGenState.points = points;
+  lastPoints = points;
+  renderTable(points);
+  populateLastPointSelect(points);
+  renderMap(points, lastGenState.centerLat, lastGenState.centerLon, lastGenState.outerR, lastGenState.innerR, lastGenState.MID_FRAC, lastGenState.departure, lastGenState.arrival, true);
+  updateRangeSummary(points);
+  updateTextPreviews();
+  showToast('Point removed from map \u2014 recalculated');
+}
+
+function handlePointEdited(){
+  if (!lastGenState) return;
+  renderTable(lastGenState.points);
+  populateLastPointSelect(lastGenState.points);
+  renderMap(lastGenState.points, lastGenState.centerLat, lastGenState.centerLon, lastGenState.outerR, lastGenState.innerR, lastGenState.MID_FRAC, lastGenState.departure, lastGenState.arrival, true);
+  updateRangeSummary(lastGenState.points);
+  updateTextPreviews();
+  showToast('Point moved \u2014 recalculated');
 }
 
 function updateTextPreviews(){
@@ -1632,6 +1734,73 @@ function download800UiPoints(){
 }
 
 document.getElementById('ui800Btn').addEventListener('click', download800UiPoints);
+
+// --- KML export ---------------------------------------------------------------------------
+
+function escapeXml(s){
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function buildKml(){
+  if (!lastGenState) return null;
+  const seq = getEffectiveSequence();
+  if (seq.length < 2) return null;
+  const missionName = document.getElementById('missionName').value || 'STORM';
+
+  let seqCounter = 0;
+  const placemarks = seq.map(p => {
+    const isAirport = p.type.includes('Airport');
+    const label = isAirport ? p.id : String(++seqCounter);
+    return `  <Placemark>
+    <name>${escapeXml(label)}</name>
+    <description>${escapeXml(p.type)}</description>
+    <styleUrl>#dotStyle</styleUrl>
+    <Point><coordinates>${p.lon.toFixed(6)},${p.lat.toFixed(6)},0</coordinates></Point>
+  </Placemark>`;
+  }).join('\n');
+
+  const lineCoords = seq.map(p => `${p.lon.toFixed(6)},${p.lat.toFixed(6)},0`).join(' ');
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+<Document>
+  <name>${escapeXml(missionName)} G-IV Pattern</name>
+  <Style id="pathStyle"><LineStyle><color>ffd6d45f</color><width>3</width></LineStyle></Style>
+  <Style id="dotStyle">
+    <IconStyle>
+      <color>ff5fd4d6</color>
+      <scale>0.8</scale>
+      <Icon><href>http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png</href></Icon>
+    </IconStyle>
+    <LabelStyle><scale>0.9</scale></LabelStyle>
+  </Style>
+  <Placemark>
+    <name>Flight Path</name>
+    <styleUrl>#pathStyle</styleUrl>
+    <LineString><tessellate>1</tessellate><coordinates>
+${lineCoords}
+    </coordinates></LineString>
+  </Placemark>
+${placemarks}
+</Document>
+</kml>`;
+}
+
+function downloadKml(){
+  if (!lastGenState){ alert('Generate the pattern first.'); return; }
+  const kml = buildKml();
+  if (!kml){ alert('Need at least 2 points to build a KML file.'); return; }
+  const missionName = (document.getElementById('missionName').value || 'STORM').toLowerCase();
+  const blob = new Blob([kml], {type:'application/vnd.google-earth.kml+xml'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `${missionName}_pattern.kml`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('KML downloaded');
+}
+
+document.getElementById('kmlBtn').addEventListener('click', downloadKml);
 
 document.getElementById('genBtn').addEventListener('click', generate);
 document.getElementById('removeSelectedBtn').addEventListener('click', removeSelectedPoints);
