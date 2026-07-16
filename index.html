@@ -231,7 +231,7 @@
     <summary>Airports</summary>
     <label for="depId">Departure &mdash; Identifier (type ICAO code or name)</label>
     <input id="depId" type="text" placeholder="e.g. KMCF" maxlength="60" list="airportCodes" autocomplete="off">
-    <div class="hint" id="depMatch">Type a US ICAO code (e.g. KMCF) to auto-fill coordinates, or enter lat/lon manually below.</div>
+    <div class="hint" id="depMatch">Type an ICAO code (e.g. KMCF or MRLB) to auto-fill coordinates, or enter lat/lon manually below.</div>
     <div class="row">
       <div>
         <label for="depLat">Latitude</label>
@@ -264,7 +264,7 @@
 
     <label for="arrId">Arrival &mdash; Identifier (type ICAO code or name)</label>
     <input id="arrId" type="text" placeholder="e.g. KMCF" maxlength="60" list="airportCodes" autocomplete="off">
-    <div class="hint" id="arrMatch">Type a US ICAO code (e.g. KMCF) to auto-fill coordinates, or enter lat/lon manually below.</div>
+    <div class="hint" id="arrMatch">Type an ICAO code (e.g. KMCF or MRLB) to auto-fill coordinates, or enter lat/lon manually below.</div>
     <div class="row">
       <div>
         <label for="arrLat">Latitude</label>
@@ -748,6 +748,7 @@ const US_AIRPORTS = [
   ["PHNL","Daniel K. Inouye International Airport","Honolulu, Oahu","HI",21.3184,-157.9257],
   ["PHOG","Kahului International Airport","Kahului","HI",20.8963,-156.4318],
   ["PHTO","Hilo International Airport","Hilo","HI",19.7214,-155.0454],
+  ["MRLB","Daniel Oduber Quir\u00f3s International Airport","Liberia","Costa Rica",10.5933,-85.5444],
 ];
 const AIRPORTS_BY_CODE = {};
 for (const rec of US_AIRPORTS){
@@ -786,10 +787,10 @@ function wireAirportAutofill(prefix){
       matchEl.textContent = `Matched: ${rec.name} \u2014 ${rec.city}, ${rec.state}`;
       matchEl.style.color = '#4dbd8a';
     } else if (code.length > 0){
-      matchEl.textContent = 'No exact match in the US airport list \u2014 enter lat/lon manually below.';
+      matchEl.textContent = 'No exact match in the airport list \u2014 enter lat/lon manually below.';
       matchEl.style.color = '#8fa1b3';
     } else {
-      matchEl.textContent = 'Type a US ICAO code (e.g. KMCF) to auto-fill coordinates, or enter lat/lon manually below.';
+      matchEl.textContent = 'Type an ICAO code (e.g. KMCF or MRLB) to auto-fill coordinates, or enter lat/lon manually below.';
       matchEl.style.color = '#8fa1b3';
     }
   });
@@ -893,9 +894,10 @@ function initMap(){
 }
 
 function makeIcon(label, bg, border, size){
+  const fontSize = String(label).length > 2 ? 8 : 10;
   return L.divIcon({
     className: 'giv-marker',
-    html: `<div style="width:${size}px;height:${size}px;background:${bg};border:1.5px solid ${border};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;color:${border};box-shadow:0 0 6px ${border}66;">${label}</div>`,
+    html: `<div style="width:${size}px;height:${size}px;background:${bg};border:1.5px solid ${border};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:${fontSize}px;font-weight:600;color:${border};box-shadow:0 0 6px ${border}66;">${label}</div>`,
     iconSize: [size, size],
     iconAnchor: [size/2, size/2]
   });
@@ -1105,6 +1107,28 @@ function updateRangeSummary(points){
   const pct = (total / maxRange) * 100;
   const over = total > maxRange;
   const flightMin = (total / groundSpeed) * 60;
+
+  let depLegHtml = '', arrLegHtml = '';
+  if (lastGenState){
+    const { departure, arrival } = lastGenState;
+    const patternPoints = lastGenState.points.filter(p => !p.type.includes('Airport'));
+    const dispLabels = computeDisplayLabels(lastGenState.points).filter((l, i) => !lastGenState.points[i].type.includes('Airport'));
+    const firstId = document.getElementById('firstPointSelect').value;
+    const lastId = document.getElementById('lastPointSelect').value;
+    const firstIdx = patternPoints.findIndex(p => p.id === firstId);
+    const lastIdx = patternPoints.findIndex(p => p.id === lastId);
+    const firstPt = patternPoints[firstIdx];
+    const lastPt = patternPoints[lastIdx];
+    if (departure && firstPt){
+      const d = haversineNm(departure.lat, departure.lon, firstPt.lat, firstPt.lon);
+      depLegHtml = `<div style="font-size:12.5px; color:#8fa1b3;">${departure.id} &rarr; point ${dispLabels[firstIdx].label}: <span style="color:var(--ink); font-weight:600;">${d.toFixed(1)} nmi</span></div>`;
+    }
+    if (arrival && lastPt){
+      const d = haversineNm(lastPt.lat, lastPt.lon, arrival.lat, arrival.lon);
+      arrLegHtml = `<div style="font-size:12.5px; color:#8fa1b3;">point ${dispLabels[lastIdx].label} &rarr; ${arrival.id}: <span style="color:var(--ink); font-weight:600;">${d.toFixed(1)} nmi</span></div>`;
+    }
+  }
+
   div.style.display = 'block';
   div.style.borderLeft = `6px solid ${over ? '#e2596b' : '#4dbd8a'}`;
   div.style.background = over ? '#2a1216' : '#0f2318';
@@ -1118,6 +1142,7 @@ function updateRangeSummary(points){
     <div style="margin-top:8px; height:8px; background:#1a2330; border-radius:4px; overflow:hidden;">
       <div style="height:100%; width:${Math.min(pct,100).toFixed(1)}%; background:${over ? '#e2596b' : '#4dbd8a'};"></div>
     </div>
+    ${(depLegHtml || arrLegHtml) ? `<div style="margin-top:10px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px; padding-top:9px; border-top:1px solid #1e2938;">${depLegHtml}${arrLegHtml}</div>` : ''}
     <div style="margin-top:10px; display:flex; justify-content:space-between; align-items:baseline; flex-wrap:wrap; gap:8px; padding-top:9px; border-top:1px solid #1e2938;">
       <div style="font-size:13.5px; font-weight:700; color:#dbe4ec;">\u2708 Total flight time: ${minutesToHM(flightMin)}</div>
       <div style="font-size:12px; color:#8fa1b3;">at ${groundSpeed.toFixed(0)} kt</div>
@@ -1129,7 +1154,7 @@ function updateRangeSummary(points){
 function renderTable(points){
   const tbody = document.getElementById('tbody');
   tbody.innerHTML = '';
-  let seqCounter = 0;
+  const labels = computeDisplayLabels(points);
   points.forEach((p, i) => {
     const tr = document.createElement('tr');
     let tagClass = 'outer';
@@ -1139,11 +1164,11 @@ function renderTable(points){
     else if (p.type.startsWith('Center')) tagClass='center';
     else if (p.type.includes('Airport')) tagClass='airport';
     const isAirport = p.type.includes('Airport');
-    if (!isAirport) seqCounter += 1;
+    const { seq, label } = labels[i];
     tr.innerHTML = `
       <td>${isAirport ? '' : `<input type="checkbox" class="rowSelect" data-idx="${i}" style="width:auto; accent-color:var(--accent);">`}</td>
-      <td>${isAirport ? '&mdash;' : seqCounter}</td>
-      <td><strong title="${isAirport ? p.id : 'Originally '+p.id+' \u2014 '+p.type}">${isAirport ? p.id : seqCounter}</strong></td>
+      <td>${seq===null ? '&mdash;' : seq}</td>
+      <td><strong title="Originally ${p.id} \u2014 ${p.type}">${label}</strong></td>
       <td><span class="tag ${tagClass}">${p.type}</span></td>
       <td>${p.bearing===null?'&mdash;':p.bearing.toFixed(0)+'&deg;'}</td>
       <td>${p.range===null?'&mdash;':p.range.toFixed(1)}</td>
@@ -1179,15 +1204,14 @@ function populatePointSelect(selectId, points, fallback, preferLast){
   const sel = document.getElementById(selectId);
   const prevValue = sel.value || fallback;
   sel.innerHTML = '';
-  let seqCounter = 0;
-  for (const p of points){
-    if (p.type.includes('Airport')) continue;
-    seqCounter += 1;
+  const dispLabels = computeDisplayLabels(points);
+  points.forEach((p, i) => {
+    if (p.type.includes('Airport')) return;
     const opt = document.createElement('option');
     opt.value = p.id;
-    opt.textContent = '#' + seqCounter + ' \u2014 ' + p.type;
+    opt.textContent = '#' + dispLabels[i].label + ' \u2014 ' + p.type;
     sel.appendChild(opt);
-  }
+  });
   const hasPrev = [...sel.options].some(o => o.value === prevValue);
   const hasFallback = [...sel.options].some(o => o.value === fallback);
   if (hasPrev){
@@ -1254,7 +1278,8 @@ function renderMap(points, centerLat, centerLon, outerR, innerR, MID_FRAC, depar
         drawLine(fig4Vertices[i].id, fig4Vertices[i+1].id, '#1f6fb2', 2.8);
       }
       for (const m of fig4Midpoints){
-        const v = fig4Vertices.find(vv => Math.abs(vv.bearing - m.bearing) < 0.01);
+        const vertexId = m.id.replace(/^M-/, '');
+        const v = fig4Vertices.find(vv => vv.id === vertexId);
         if (v) drawLine(m.id, v.id, '#1f6fb2', 1.8, '4,4');
       }
       // connect the inner ring's last point to the figure-four's entry vertex (lowest new number),
@@ -1274,21 +1299,20 @@ function renderMap(points, centerLat, centerLon, outerR, innerR, MID_FRAC, depar
     }
   }
 
-  let mapSeqCounter = 0;
+  const mapLabels = computeDisplayLabels(points);
   points.forEach((p, idx) => {
     if (p.type.includes('Airport')) return;
-    mapSeqCounter += 1;
     let bg='#0a1118', border='#5fd4d6', size=26;
     const isCenter = p.id==='CTR';
     if (isCenter){ bg='#e8574a'; border='#e8574a'; size=22; }
     else if (p.type.startsWith('Mid')){ bg='#0a1118'; border='#e8a13c'; size=20; }
     else if (p.type.startsWith('Inner')){ bg='#0a1118'; border='#5fd4d6'; size=24; }
     else if (p.type.startsWith('Figure-Four')){ bg='#0a1118'; border='#f2437a'; size=24; }
-    const label = mapSeqCounter; // matches the Fix List's renumbered Seq/Pt columns exactly
+    const label = mapLabels[idx].label; // matches the Fix List's Pt column exactly
 
     const bearingLine = p.bearing===null ? '' : (p.bearing.toFixed(0)+'&deg; / '+p.range.toFixed(1)+' nmi<br>');
     const actionHint = isCenter ? '' : '<br><em style="color:var(--muted);">click to remove &middot; drag to reposition</em>';
-    const tooltipHtml = '<strong>#'+mapSeqCounter+'</strong> <span style="color:var(--muted);">(originally '+p.id+')</span> &mdash; '+p.type+'<br>'+bearingLine+decToDMS(p.lat,true)+' '+decToDMS(p.lon,false)+actionHint;
+    const tooltipHtml = '<strong>#'+label+'</strong> <span style="color:var(--muted);">(originally '+p.id+')</span> &mdash; '+p.type+'<br>'+bearingLine+decToDMS(p.lat,true)+' '+decToDMS(p.lon,false)+actionHint;
 
     const marker = L.marker(ll(p), { icon: makeIcon(label, bg, border, size), draggable: !isCenter }).addTo(layerGroup);
     marker.bindTooltip(tooltipHtml, { className:'mono-tip', direction:'top', offset:[0,-size/2] });
@@ -1389,6 +1413,29 @@ function downloadCSV(){
 
 // --- HRD-style drops/turns export -----------------------------------------
 
+// Shared numbering rule used everywhere (table, map, exports, KML): only outer/inner ring points
+// and figure-four VERTICES consume the primary sequence (1, 2, 3...) — midpoints are auxiliary to
+// a specific vertex (labeled M<vertex#>, not their own slot) and the center fix/airports get their
+// own distinct labels, so nothing steals numbers from the real ring/figure-four sequence.
+function computeDisplayLabels(points){
+  const seqByOriginalId = {};
+  let seqCounter = 0;
+  for (const p of points){
+    if (p.type.includes('Airport') || p.type.startsWith('Mid') || p.type === 'Center Fix') continue;
+    seqCounter += 1;
+    seqByOriginalId[p.id] = seqCounter;
+  }
+  return points.map(p => {
+    if (p.type.includes('Airport')) return { seq: null, label: p.id };
+    if (p.type === 'Center Fix') return { seq: null, label: 'C' };
+    if (p.type.startsWith('Mid')){
+      const vertexSeq = seqByOriginalId[p.id.replace(/^M-/, '')];
+      return { seq: null, label: vertexSeq ? ('M'+vertexSeq) : 'M' };
+    }
+    return { seq: seqByOriginalId[p.id], label: String(seqByOriginalId[p.id]) };
+  });
+}
+
 function dropLabel(id){
   return id; // plain point number, no suffix
 }
@@ -1399,9 +1446,10 @@ function padR(str, width){ str = String(str); return str.length>=width ? str : s
 function buildExportRows(){
   const groundSpeed = parseFloat(document.getElementById('groundSpeed').value) || 450;
   const pts = getEffectiveSequence();
+  const dispLabels = computeDisplayLabels(pts);
 
   const rows = [];
-  let totalNm = 0, elapsedMin = 0, seqCounter = 0;
+  let totalNm = 0, elapsedMin = 0;
   for (let i=0; i<pts.length; i++){
     const p = pts[i];
     let legNm = 0;
@@ -1413,9 +1461,8 @@ function buildExportRows(){
       elapsedMin += (legNm / groundSpeed) * 60;
     }
     const isAirport = p.type.includes('Airport');
-    if (!isAirport) seqCounter += 1;
     rows.push({
-      label: isAirport ? p.id : dropLabel(String(seqCounter)),
+      label: isAirport ? p.id : dropLabel(dispLabels[i].label),
       isAirport,
       lat: p.lat, lon: p.lon,
       rad: p.range, azm: p.bearing,
@@ -1747,10 +1794,9 @@ function buildKml(){
   if (seq.length < 2) return null;
   const missionName = document.getElementById('missionName').value || 'STORM';
 
-  let seqCounter = 0;
-  const placemarks = seq.map(p => {
-    const isAirport = p.type.includes('Airport');
-    const label = isAirport ? p.id : String(++seqCounter);
+  const dispLabels = computeDisplayLabels(seq);
+  const placemarks = seq.map((p, i) => {
+    const label = dispLabels[i].label;
     return `  <Placemark>
     <name>${escapeXml(label)}</name>
     <description>${escapeXml(p.type)}</description>
