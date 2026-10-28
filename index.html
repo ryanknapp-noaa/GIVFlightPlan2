@@ -161,6 +161,12 @@
   .leaflet-control-zoom a:hover{ background:#16212f !important; }
   .leaflet-control-attribution{ background:rgba(10,17,24,.75) !important; color:var(--muted) !important; font-size:9px !important; }
   .leaflet-control-attribution a{ color:var(--accent) !important; }
+  /* OpenStreetMap fallback: invert the light tiles into a dark theme to match the page */
+  .osm-dark{ filter: invert(1) hue-rotate(180deg) brightness(.9) contrast(.9) saturate(.6); }
+  .leaflet-control-layers{ background:rgba(10,17,24,.92) !important; color:var(--ink) !important; border:1px solid var(--border) !important; font-family:var(--mono); font-size:11px; }
+  .leaflet-control-layers-toggle{ filter: invert(1) hue-rotate(180deg); }
+  .leaflet-control-layers label{ margin:2px 0; color:var(--ink); text-transform:none; letter-spacing:0; font-weight:400; font-size:11px; }
+  .leaflet-control-layers input{ width:auto; accent-color:var(--accent); }
   .leaflet-tooltip.mono-tip{
     background:#0f1922; border:1px solid var(--border); color:var(--ink);
     font-family:var(--mono); font-size:11px; border-radius:3px;
@@ -445,7 +451,7 @@
   </div>
   </div>
 
-  <footer>All ranges/bearings computed via great-circle destination formula (spherical Earth, R = 3440.065 nmi). Map tiles &copy; OpenStreetMap contributors. <b>Verify</b> against official NOAA/AOML mission tasking before flight.</footer>
+  <footer>All ranges/bearings computed via great-circle destination formula (spherical Earth, R = 3440.065 nmi). Map tiles &copy; Esri and OpenStreetMap contributors (keyless; switch basemaps from the map's layer button). <b>Verify</b> against official NOAA/AOML mission tasking before flight.</footer>
   </div>
 
 </div>
@@ -619,6 +625,7 @@ const US_AIRPORTS = [
   ["KLYH","Lynchburg Regional Airport - Preston Glenn Field","Lynchburg","VA",37.3267,-79.2004],
   ["KMAF","Midland International Air and Space Port","Midland","TX",31.9425,-102.202],
   ["KMBS","MBS International Airport","Freeland","MI",43.5332,-84.0831],
+  ["KMCF","MacDill Air Force Base","Tampa","FL",27.8493,-82.5212],
   ["KMCI","Kansas City International Airport","Kansas City","MO",39.3017,-94.7139],
   ["KMCO","Orlando International Airport","Orlando","FL",28.4294,-81.309],
   ["KMDT","Harrisburg International Airport","Harrisburg","PA",40.1928,-76.7623],
@@ -883,13 +890,63 @@ let layerGroup = null;
 let isCustomized = false; // true once a point has been removed or dragged — switches the map to a simple connect-the-dots path instead of the structural ring/spoke drawing
 let legendControl = null;
 
+// --- Basemaps (all keyless) -----------------------------------------------------------
+// CARTO began stamping "API KEY REQUIRED" on every anonymous tile in late Aug 2026, so the map
+// now uses providers that need no key. Esri's Dark Gray Canvas is the default (closest match to
+// the old CARTO Dark Matter look); the others are available from the layer switcher (top right).
+// If the active basemap fails to load (outage, blocked network), the map automatically falls
+// back to the next one in BASEMAP_FALLBACK_ORDER.
+const ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services/';
+const ESRI_ATTR = 'Tiles &copy; <a href="https://www.esri.com">Esri</a> &mdash; Esri, HERE, Garmin, &copy; OpenStreetMap contributors, and the GIS user community';
+
+function makeBasemaps(){
+  const opts = (extra) => Object.assign({ maxZoom: 19, crossOrigin: true }, extra);
+  return {
+    'Dark Gray (Esri)': L.layerGroup([
+      L.tileLayer(ESRI+'Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', opts({ maxNativeZoom:16, attribution: ESRI_ATTR })),
+      L.tileLayer(ESRI+'Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}', opts({ maxNativeZoom:16, pane:'labels' }))
+    ]),
+    'Ocean (Esri)': L.tileLayer(ESRI+'Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}', opts({ maxNativeZoom:13, attribution: 'Tiles &copy; Esri &mdash; GEBCO, NOAA, National Geographic, DeLorme, HERE, Geonames.org, and other contributors' })),
+    'Satellite (Esri)': L.tileLayer(ESRI+'World_Imagery/MapServer/tile/{z}/{y}/{x}', opts({ maxNativeZoom:18, attribution: 'Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community' })),
+    'OpenStreetMap (dark)': L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', opts({ className:'osm-dark', attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' }))
+  };
+}
+const BASEMAP_FALLBACK_ORDER = ['Dark Gray (Esri)', 'OpenStreetMap (dark)', 'Ocean (Esri)', 'Satellite (Esri)'];
+
+// Watches a basemap for failed tiles; if most of the first batch fails, switch to the next provider.
+function watchBasemap(name, layer, basemaps){
+  const tiles = layer instanceof L.TileLayer ? [layer] : layer.getLayers();
+  let ok = 0, bad = 0, switched = false;
+  const check = () => {
+    if (switched || !map.hasLayer(layer)) return;
+    if (bad >= 6 && bad > ok){
+      switched = true;
+      const next = BASEMAP_FALLBACK_ORDER[BASEMAP_FALLBACK_ORDER.indexOf(name)+1];
+      if (!next) return;
+      map.removeLayer(layer);
+      map.addLayer(basemaps[next]);
+      showToast(`${name} unavailable — switched to ${next}`);
+    }
+  };
+  tiles.forEach(t => {
+    t.on('tileload', () => { ok++; });
+    t.on('tileerror', () => { bad++; check(); });
+  });
+}
+
 function initMap(){
   map = L.map('map', { zoomSnap:0.25 }).setView([25, -65], 5);
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-    subdomains: 'abcd',
-    maxZoom: 19,
-    attribution: '&copy; OpenStreetMap contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-  }).addTo(map);
+  // label pane sits above the basemap but below the route lines (overlayPane = 400)
+  map.createPane('labels');
+  map.getPane('labels').style.zIndex = 350;
+  map.getPane('labels').style.pointerEvents = 'none';
+  const basemaps = makeBasemaps();
+  for (const [name, layer] of Object.entries(basemaps)) watchBasemap(name, layer, basemaps);
+  let saved = null;
+  try { saved = localStorage.getItem('givBasemap'); } catch(e){}
+  (basemaps[saved] || basemaps[BASEMAP_FALLBACK_ORDER[0]]).addTo(map);
+  L.control.layers(basemaps, null, { position:'topright', collapsed:true }).addTo(map);
+  map.on('baselayerchange', (e) => { try { localStorage.setItem('givBasemap', e.name); } catch(err){} });
   layerGroup = L.layerGroup().addTo(map);
 }
 
